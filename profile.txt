@@ -1,7 +1,7 @@
 # User data defaults
-#NAME="Rod"
-#USERNAME="rod"
-#PASSWORD="board"
+#NAME="Mike"
+#USERNAME="mike"
+#PASSWORD="mike"
 #COMPILER="gcc"
 #CCACHE="1"
 #NETWORKMANAGER="1"
@@ -9,8 +9,8 @@
 #USERACCT="0"
 #USER_PKGS="htop libsensors-dev rsyslog"
 #LOCALE="en_US.UTF-8"
-#LOCALE_LC_ALL="C.UTF-8"
-#TIMEZONE="America/New_York" 
+#LOCALE_LC_ALL="en_US.UTF-8"
+#TIMEZONE="America/Vancouver" 
 #NAMESERVER1="8.8.8.8"
 #NAMESERVER2="8.8.4.4"
 
