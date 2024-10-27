@@ -78,6 +78,35 @@ apt-get update
 echo 'Installing LinuxCNC'
 apt-get install -y linuxcnc-uspace linuxcnc-uspace-dev mesaflash
 
+echo 'Installing Flexi dependencies'
+apt-get install -y git pigpio-tools stm32flash qtbase5-dev qt5-qmake libmodbus-dev
+
+echo 'Building vfdmod'
+cd /tmp
+git clone https://github.com/mikemacwillie/vfdmod.git
+mkdir vfdmod/build
+cd vfdmod/build
+qmake ../vfdmod.pro
+make
+cp vfdmod /usr/bin
+
+echo 'Cloning the remora-flexi hal repo and building flexi component'
+cd /home/expatria
+git clone https://github.com/Expatria-Technologies/remora-flexi-hal.git remora-flexi-hal
+cd remora-flexi-hal/LinuxCNC/Components/Flexi/
+halcompile --install flexi.c
+mkdir /home/expatria/linuxcnc
+mkdir /home/expatria/linuxcnc/configs
+mkdir /home/expatria/linuxcnc/nc_files
+cp -av /home/expatria/remora-flexi-hal/LinuxCNC/ConfigSamples/flexi-hal /home/expatria/linuxcnc/configs
+cp -av /home/expatria/remora-flexi-hal/Tools/Pi\ Scripts/Pi5/* /home/expatria
+
+echo 'Cleaning up temp files'
+cd /tmp
+rm -Rf /tmp/vfdmod
+
+
+
 # Finished!
 echo "Stage 2 All done installing linuxcnc!"
 cd /tmp/
