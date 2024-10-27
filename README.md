@@ -2,7 +2,7 @@
 ## Flexi Pi
 This builds a RT patched kernel based on the Raspberry Pi repositories, then creates a Debian 12 (Bookworm) image ready to burn to a microSD card. The image includes the Flexi Remora component and vfdmod pre-installed.
 
-### The boards that are currently supported
+### Currently supported boards
 * **Raspberry Pi 5**				bcm2712 / ARM64
 
 ### Host dependencies for Debian Bookworm and Ubuntu Jammy Jellyfish / Noble Numbat
