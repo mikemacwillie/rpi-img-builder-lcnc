@@ -92,7 +92,8 @@ cp vfdmod /usr/bin
 
 echo 'Cloning the remora-flexi hal repo and building flexi component'
 cd /home/expatria
-git clone https://github.com/Expatria-Technologies/remora-flexi-hal.git remora-flexi-hal
+#git clone https://github.com/Expatria-Technologies/remora-flexi-hal.git remora-flexi-hal
+git clone http://192.168.10.227/mike/remora-flexi.git remora-flexi-hal
 cd remora-flexi-hal/LinuxCNC/Components/Flexi/
 halcompile --install flexi.c
 mkdir /home/expatria/linuxcnc
@@ -101,14 +102,31 @@ mkdir /home/expatria/linuxcnc/nc_files
 cp -av /home/expatria/remora-flexi-hal/LinuxCNC/ConfigSamples/flexi-hal /home/expatria/linuxcnc/configs
 cp -av /home/expatria/remora-flexi-hal/Tools/Pi\ Scripts/Pi5/* /home/expatria
 
+
+echo 'Cloning the Remora repo and building remora-eth component for use with uFlexiNet'
+cd /tmp
+git clone https://github.com/Expatria-Technologies/Remora.git
+cd Remora/LinuxCNC/Components/Remora-eth
+sudo halcompile --install remora-eth.c
+
+echo 'Cloning the linuxcnc_configs repo and grabbing the uFlexiNet reference config'
+cd /tmp
+git clone https://github.com/Expatria-Technologies/linuxcnc_configs.git
+cp -av /tmplinuxcnc_configs/flexi-hal-uFlexiNet-XYZ /home/expatria/linuxcnc/configs/uFlexiNet
+sed -i 's/AMA1/AMA2/' /home/expatria/linuxcnc/configs/uFlexiNet/vfdmod.ini
+
 echo 'Cleaning up temp files'
 cd /tmp
 rm -Rf /tmp/vfdmod
-
+rm -Rf /tmp/Remora
+rm -Rf /tmp/linuxcnc_configs
 
 echo 'Adding README to Desktop'
+mkdir /home/expatria/Desktop
 tee /home/expatria/Desktop/README <<EOF
 Getting started:
+
+For SPI with a Pi connected directly to the Flexi-HAL: 
 
 A git checkout of the Remora-flexi repository is present in the home directory. Update it before getting started to make sure you have the most recent version. Run 'git pull' from within the /home/expatria/remora-flexi-hal directory to update.
 
@@ -118,6 +136,22 @@ Flash your Flexi with the current build of Remora by running the following comma
 
 A base PrintNC configuration is provided in the LinuxCNC config directory at /home/expatria/linuxcnc/configs/flexi-hal. Edit the INI with your machine configuration prior to attempting motion.
 This base configuration includes QtDragon_hd and vfdmod. vfdmod is configured for the Durapulse GS10 VFD, but the configuration can be changed fairly easily to suit a Modbus VFD.
+
+
+
+
+For Ethernet via uFlexinet: 
+
+The remora-eth component is pre-installed in this image. Also included is a reference configuration for use with the uFlexiNet in the LinuxCNC config directory at /home/expatria/linuxcnc/configs/uFlexiNet. You will need upload your configuration file to the FlexiHAL using the upload_config.py script that should be in your configuration folder:
+
+python3 upload_config.py FlexiHAL-config.txt
+
+To use the RS485 interface on the FlexiHAL via the uFlexiNet you can set up a virtual serial port and use socat to bridge between userspace Modbus components and Remora. If the RS485 component is included in the board config txt, it will listen on port 27183 for UDP packets and forward them to the RS485 port: 
+
+socat pty, link=/tmp/virtualcom0, raw udp:10.10.10.10:27183 &
+
+More information on the Ethernet implmentation can be found in the README in the repository: https://github.com/Expatria-Technologies/Remora-STM32F4xx-W5500
+
 EOF
 
 
