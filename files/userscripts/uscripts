@@ -112,14 +112,31 @@ sudo halcompile --install remora-eth.c
 echo 'Cloning the linuxcnc_configs repo and grabbing the uFlexiNet reference config'
 cd /tmp
 git clone https://github.com/Expatria-Technologies/linuxcnc_configs.git
-cp -av /tmplinuxcnc_configs/flexi-hal-uFlexiNet-XYZ /home/expatria/linuxcnc/configs/uFlexiNet
+cp -av /tmp/linuxcnc_configs/flexi-hal-uFlexiNet-XYZ /home/expatria/linuxcnc/configs/uFlexiNet
 sed -i 's/AMA1/AMA2/' /home/expatria/linuxcnc/configs/uFlexiNet/vfdmod.ini
+
+echo 'Enabling auto-login for expatria user'
+sed -i 's/\#autologin-user=/autologin-user=expatria/' /etc/lightdm/lightdm.conf
+
+echo 'Disabling display power management and sleep by default'
+tee /etc/xdg/xfce4/xfconf/xfce-perchannel-xml/xfce4-power-manager.xml <<EOF
+<channel name="xfce4-power-manager" version="1.0">
+  <property name="xfce4-power-manager" type="empty">
+    <property name="power-button-action" type="empty"/>
+    <property name="show-tray-icon" type="bool" value="false"/>
+    <property name="blank-on-ac" type="int" value="0"/>
+    <property name="dpms-on-ac-sleep" type="uint" value="0"/>
+    <property name="dpms-on-ac-off" type="uint" value="0"/>
+  </property>
+</channel>
+EOF
 
 echo 'Cleaning up temp files'
 cd /tmp
 rm -Rf /tmp/vfdmod
 rm -Rf /tmp/Remora
 rm -Rf /tmp/linuxcnc_configs
+rm -rf /tmp/linuxcnc
 
 echo 'Adding README to Desktop'
 mkdir /home/expatria/Desktop
@@ -157,9 +174,7 @@ EOF
 
 
 # Finished!
-echo "Stage 2 All done installing linuxcnc!"
-cd /tmp/
-rm -rf /tmp/linuxcnc 
+echo "Stage 2 done"
 }
 
 run_function3 (){
