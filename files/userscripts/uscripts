@@ -19,7 +19,7 @@ run_function2 (){
 
 # Get the Linuxcnc Debs
 
-echo "Installing linuxcnc" 
+echo "Installing linuxcnc repository" 
 mkdir -p /tmp/linuxcnc/
 cd /tmp/linuxcnc/
 gpg --homedir /tmp/linuxcnc/ --keyserver hkp://keyserver.ubuntu.com --recv-key 3cb9fd148f374fef
@@ -79,7 +79,7 @@ echo 'Installing LinuxCNC'
 apt-get install -y linuxcnc-uspace linuxcnc-uspace-dev mesaflash
 
 echo 'Installing Flexi dependencies'
-apt-get install -y git pigpio-tools stm32flash qtbase5-dev qt5-qmake libmodbus-dev
+apt-get install -y git pigpio-tools stm32flash qtbase5-dev qt5-qmake libmodbus-dev python3-gst-1.0
 
 echo 'Building vfdmod'
 cd /tmp
@@ -102,7 +102,6 @@ mkdir /home/expatria/linuxcnc/nc_files
 cp -av /home/expatria/remora-flexi-hal/LinuxCNC/ConfigSamples/flexi-hal /home/expatria/linuxcnc/configs
 cp -av /home/expatria/remora-flexi-hal/Tools/Pi\ Scripts/Pi5/* /home/expatria
 
-
 echo 'Cloning the Remora repo and building remora-eth component for use with uFlexiNet'
 cd /tmp
 git clone https://github.com/Expatria-Technologies/Remora.git
@@ -114,6 +113,18 @@ cd /tmp
 git clone https://github.com/Expatria-Technologies/linuxcnc_configs.git
 cp -av /tmp/linuxcnc_configs/flexi-hal-uFlexiNet-XYZ /home/expatria/linuxcnc/configs/uFlexiNet
 sed -i 's/AMA1/AMA2/' /home/expatria/linuxcnc/configs/uFlexiNet/vfdmod.ini
+
+echo 'Cloning the upstream Remora repo and installing the default remora-spi and remora-eth-3.0 components for non-Expatria boards'
+cd /tmp
+git clone https://github.com/scottalford75/Remora.git Remora-upstream
+cd Remora-upstream/LinuxCNC/Components/Remora-spi
+sudo halcompile --install remora-spi.c
+cd /tmp/Remora-upstream/LinuxCNC/Components/Remora-eth
+sudo halcompile --install remora-eth-3.0.c 
+
+echo 'Copying ngcgui library to config dir'
+cp -av /usr/share/linuxcnc/ncfiles/ngcgui_lib /home/expatria/linuxcnc/
+
 
 echo 'Enabling auto-login for expatria user'
 sed -i 's/\#autologin-user=/autologin-user=expatria/' /etc/lightdm/lightdm.conf
@@ -135,6 +146,7 @@ echo 'Cleaning up temp files'
 cd /tmp
 rm -Rf /tmp/vfdmod
 rm -Rf /tmp/Remora
+rm -Rf /tmp/Remora-upstream
 rm -Rf /tmp/linuxcnc_configs
 rm -rf /tmp/linuxcnc
 
@@ -168,6 +180,11 @@ To use the RS485 interface on the FlexiHAL via the uFlexiNet you can set up a vi
 socat pty, link=/tmp/virtualcom0, raw udp:10.10.10.10:27183 &
 
 More information on the Ethernet implmentation can be found in the README in the repository: https://github.com/Expatria-Technologies/Remora-STM32F4xx-W5500
+
+
+
+
+If you'd like to autostart LinuxCNC on boot after configuring your machine, add 'linuxcnc -l' to 'Application Autostart' in the 'Session and Startup' menu to automatically load the configuration you last selected in the LinuxCNC selection window. 
 
 EOF
 
