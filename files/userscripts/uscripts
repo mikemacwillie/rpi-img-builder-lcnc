@@ -93,7 +93,7 @@ cp vfdmod /usr/bin
 echo 'Cloning the remora-flexi hal repo and building flexi component'
 cd /home/expatria
 #git clone https://github.com/Expatria-Technologies/remora-flexi-hal.git remora-flexi-hal
-git clone http://192.168.10.227/mike/remora-flexi.git remora-flexi-hal
+git clone http://192.168.10.227/mike/remora-flexi.git -b pi5 remora-flexi-hal
 cd remora-flexi-hal/LinuxCNC/Components/Flexi/
 halcompile --install flexi.c
 mkdir /home/expatria/linuxcnc
@@ -106,7 +106,7 @@ echo 'Cloning the Remora repo and building remora-eth component for use with uFl
 cd /tmp
 git clone https://github.com/Expatria-Technologies/Remora.git
 cd Remora/LinuxCNC/Components/Remora-eth
-sudo halcompile --install remora-eth.c
+halcompile --install remora-eth.c
 
 echo 'Cloning the linuxcnc_configs repo and grabbing the uFlexiNet reference config'
 cd /tmp
@@ -118,9 +118,9 @@ echo 'Cloning the upstream Remora repo and installing the default remora-spi and
 cd /tmp
 git clone https://github.com/scottalford75/Remora.git Remora-upstream
 cd Remora-upstream/LinuxCNC/Components/Remora-spi
-sudo halcompile --install remora-spi.c
+halcompile --install remora-spi.c
 cd /tmp/Remora-upstream/LinuxCNC/Components/Remora-eth
-sudo halcompile --install remora-eth-3.0.c 
+halcompile --install remora-eth-3.0.c 
 
 echo 'Copying ngcgui library to config dir'
 cp -av /usr/share/linuxcnc/ncfiles/ngcgui_lib /home/expatria/linuxcnc/
