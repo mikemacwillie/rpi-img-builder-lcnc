@@ -20,8 +20,8 @@ jobs:
     - name: Install dependencies
       run: make ccompile
 
-    - name: Build Pi 5 kernel
-      run: make commit board=bcm2712
+    #- name: Build Pi 5 kernel
+    #  run: make commit board=bcm2712
 
     - name: Build rootfs
       run: make rootfs board=bcm2712
