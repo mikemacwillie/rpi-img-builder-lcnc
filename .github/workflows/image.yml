@@ -20,14 +20,14 @@ jobs:
     - name: Install dependencies
       run: make ccompile
 
-    #- name: Build Pi 5 kernel
-    #  run: make commit board=bcm2712
+    - name: Build Pi 5 kernel
+      run: make commit board=bcm2712
 
     - name: Build rootfs
       run: make rootfs board=bcm2712
 
     - name: Build image
-      run: make rootfs board=bcm2712
+      run: make image board=bcm2712
 
     - name: Archive image artifacts
       uses: actions/upload-artifact@v4
