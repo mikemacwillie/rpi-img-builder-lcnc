@@ -7,10 +7,10 @@ echo ""
 echo -en "Firmware"
 echo -en " ${PNK}[${FIN}${WHT}downloading${FIN}${PNK}]${FIN}"
 rm -fdr firmware
-git clone -q -n --filter=tree:0 --sparse ${FIRMWARE} tmp &> /dev/null
+git clone --filter=tree:0 --sparse ${FIRMWARE} tmp
 cd tmp
-git sparse-checkout set --no-cone --quiet boot &> /dev/null
-git checkout --quiet &> /dev/null
+git sparse-checkout set --no-cone boot
+git checkout
 rm -fdr boot/{overlays,*.dtb,kernel*}
 mv boot ../firmware
 cd ..
