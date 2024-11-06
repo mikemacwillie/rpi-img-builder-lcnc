@@ -100,7 +100,16 @@ mkdir /home/expatria/linuxcnc
 mkdir /home/expatria/linuxcnc/configs
 mkdir /home/expatria/linuxcnc/nc_files
 cp -av /home/expatria/remora-flexi-hal/LinuxCNC/ConfigSamples/flexi-hal /home/expatria/linuxcnc/configs
-cp -av /home/expatria/remora-flexi-hal/Tools/Pi\ Scripts/Pi5/* /home/expatria
+if [ $BOARD == "bcm2712" ]; then
+   echo "Using Pi 5 scripts"
+   cp -av /home/expatria/remora-flexi-hal/Tools/Pi\ Scripts/Pi5/* /home/expatria
+elif [ $BOARD == "bcm2711" ]; then
+   echo "Using Pi 4 scripts"
+   cp -av /home/expatria/remora-flexi-hal/Tools/Pi\ Scripts/Pi4/* /home/expatria
+   echo "Reconfiguring vfdmod serial port for Pi 4"
+   sed -i 's/AMA2/AMA3/' /home/expatria/linuxcnc/configs/flexi-hal/vfdmod.ini
+fi
+
 
 echo 'Cloning the Remora repo and building remora-eth component for use with uFlexiNet'
 cd /tmp
@@ -112,7 +121,14 @@ echo 'Cloning the linuxcnc_configs repo and grabbing the uFlexiNet reference con
 cd /tmp
 git clone https://github.com/Expatria-Technologies/linuxcnc_configs.git
 cp -av /tmp/linuxcnc_configs/flexi-hal-uFlexiNet-XYZ /home/expatria/linuxcnc/configs/uFlexiNet
-sed -i 's/AMA1/AMA2/' /home/expatria/linuxcnc/configs/uFlexiNet/vfdmod.ini
+if [ $BOARD == "bcm2712" ]; then
+   echo "Configuring for Pi 5"
+   sed -i 's/AMA1/AMA2/' /home/expatria/linuxcnc/configs/uFlexiNet/vfdmod.ini
+elif [ $BOARD == "bcm2711" ]; then
+   echo "Configuring for Pi 4"
+   sed -i 's/AMA1/AMA3/' /home/expatria/linuxcnc/configs/uFlexiNet/vfdmod.ini
+   sed -i 's/AMA2/AMA3/' /home/expatria/linuxcnc/configs/uFlexiNet/vfdmod.ini
+fi
 
 echo 'Cloning the upstream Remora repo and installing the default remora-spi and remora-eth-3.0 components for non-Expatria boards'
 cd /tmp
