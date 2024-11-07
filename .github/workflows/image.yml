@@ -4,6 +4,10 @@ on:
   workflow_dispatch:
   #push:
     #branches: [ "master" ]
+    
+env:
+  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
 jobs:
   board_matrix:
     strategy:
@@ -23,7 +27,7 @@ jobs:
     - name: Install dependencies
       run: make ccompile
 
-    - name: Build Pi 5 kernel
+    - name: Build kernel
       run: make commit board=${{ matrix.board }}
 
     - name: Build rootfs
@@ -39,4 +43,20 @@ jobs:
         path: |
             *.img.xz
         #already compressed, no need to attempt to recompress
-        compression-level: 0 
+        compression-level: 0
+
+  create_release:
+    needs: board_matrix
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifacts from matrix
+        uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+    
+      - name: Create draft release and upload artifacts
+        run: |
+            ls -a
+            BUILD=`date +'%Y-%m-%d'`
+            gh release create -t $BUILD v$BUILD -R ${{github.repository}} --draft --notes="Test Release"
+            gh release upload v$BUILD *.img.xz -R  ${{github.repository}}
