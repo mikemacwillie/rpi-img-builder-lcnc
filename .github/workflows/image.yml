@@ -1,11 +1,14 @@
-name: Build Images
+name: Build Pi Images
 
 on:
   workflow_dispatch:
   #push:
     #branches: [ "master" ]
 jobs:
-  build:
+  board_matrix:
+    strategy:
+      matrix:
+        board: [bcm2712, bcm2711]
     runs-on: ubuntu-24.04
     environment: Test
     steps:
@@ -21,18 +24,18 @@ jobs:
       run: make ccompile
 
     - name: Build Pi 5 kernel
-      run: make commit board=bcm2712
+      run: make commit board=${{ matrix.board }}
 
     - name: Build rootfs
-      run: make rootfs board=bcm2712
+      run: make rootfs board=${{ matrix.board }}
 
     - name: Build image
-      run: make image board=bcm2712
+      run: make image board=${{ matrix.board }}
 
     - name: Archive image artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: Test Image Pi5
+        name: Test Image board=${{ matrix.board }}
         path: |
             *.img.xz
         #already compressed, no need to attempt to recompress
