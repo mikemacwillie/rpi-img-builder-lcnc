@@ -28,6 +28,8 @@ Jumpers need to be in place in the marked locations on the Flexi-HAL for the Pi 
 <img src="https://github.com/Expatria-Technologies/remora-flexi-hal/raw/master/Images/Jumper_locations.png" width="500">
 
 These are shipped in place by default from the Expatria shop, but if they have been moved or removed they will need to be replaced. 
+
+To provide sufficient clearance for a cooler on a Pi 5, a 40-pin female header can be used as a riser between the Flexi-HAL and the Pi. 
  
 
 ## Support
