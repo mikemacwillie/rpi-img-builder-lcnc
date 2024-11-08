@@ -1,6 +1,6 @@
 ## Flexi Pi
 
-Flexi-Pi is a custom configured LinuxCNC image for use with the [Flexi_HAL](https://github.com/Expatria-Technologies/Flexi-HAL) CNC controller and Remora firmware.The Flexi LinuxCNC components are pre-installed along with all of their dependencies, and reference configurations are included to get you started. **You will need to edit these configurations for your specific machine before attempting motion.** The base configuration runs QtDragon_hd as the default supported UI. 
+Flexi-Pi is a custom configured LinuxCNC image for use with the [Flexi-HAL](https://github.com/Expatria-Technologies/Flexi-HAL) CNC controller and Remora firmware.The Flexi LinuxCNC components are pre-installed along with all of their dependencies, and reference configurations are included to get you started. **You will need to edit these configurations for your specific machine before attempting motion.** The base configuration runs QtDragon_hd as the default supported UI. 
 
 Both the Raspberry Pi 5 and Raspberry Pi 4 are currently supported. Performance is significantly better with a Pi 5, however the Pi 4 image here performs better than the previous releases. 
 
