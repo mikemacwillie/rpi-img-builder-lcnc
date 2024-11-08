@@ -57,5 +57,5 @@ jobs:
         run: |
             ls -a
             BUILD=`date +'%Y-%m-%d'`
-            gh release create -t $BUILD v$BUILD -R ${{github.repository}} --draft --notes="Test Release"
+            gh release create -t $BUILD v$BUILD -R ${{github.repository}} --draft --notes="Write release notes!"
             gh release upload v$BUILD *.img.xz -R  ${{github.repository}}
