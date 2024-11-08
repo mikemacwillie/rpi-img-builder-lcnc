@@ -1,0 +1,61 @@
+name: Build Pi Images
+
+on:
+  workflow_dispatch:
+  #push:
+    #branches: [ "master" ]
+    
+env:
+  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+jobs:
+  board_matrix:
+    strategy:
+      matrix:
+        board: [bcm2712, bcm2711]
+    runs-on: ubuntu-24.04
+    steps:
+    - name: Install toolchain
+      run: |
+        sudo apt-get update
+        sudo apt-get -y install build-essential curl
+            
+    - name: Clone repository
+      uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: make ccompile
+
+    - name: Build kernel
+      run: make commit board=${{ matrix.board }}
+
+    - name: Build rootfs
+      run: make rootfs board=${{ matrix.board }}
+
+    - name: Build image
+      run: make image board=${{ matrix.board }}
+
+    - name: Archive image artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: Test Image board=${{ matrix.board }}
+        path: |
+            *.img.xz
+        #already compressed, no need to attempt to recompress
+        compression-level: 0
+
+  create_release:
+    needs: board_matrix
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifacts from matrix
+        uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+    
+      - name: Create draft release and upload artifacts
+        run: |
+            ls -a
+            BUILD=`date +'%Y-%m-%d'`
+            gh release create -t $BUILD v$BUILD -R ${{github.repository}} --draft --notes="Test Release"
+            gh release upload v$BUILD *.img.xz -R  ${{github.repository}}
