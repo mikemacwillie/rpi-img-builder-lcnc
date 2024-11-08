@@ -41,7 +41,7 @@ If you need help getting started or with configuration, please feel free to reac
 
 ---  
 
-## Building on Ubuntu 24.04:
+## Re-configuring and Building on Ubuntu 24.04:
 
 
 ### Currently supported boards
@@ -56,14 +56,19 @@ If you need help getting started or with configuration, please feel free to reac
   
 
 ```sh
-
 make ccompile # Install x86-64 dependencies
 
 make ncompile # Install Aarch64 dependencies
-
 ```
 
-  
+#### Building existing configuration
+
+```sh
+make commit board=bcm2712 # build RT patched kernel for Pi 5
+make rootfs board=bcm2712 # build rootfs archive
+make image board=bcm2712 # build image for Pi 5
+```
+
 
 #### Menu interface
 
@@ -157,7 +162,7 @@ Ccache: # Compiler cache
 
 Distribution
 
-Distro: # Supported: debian, devuan and ubuntu
+Distro: # Supported: debian, others untested
 
 Release: # Debian: bullseye, bookworm, testing, unstable and sid
 
