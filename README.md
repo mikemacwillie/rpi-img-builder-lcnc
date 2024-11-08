@@ -30,14 +30,16 @@ Jumpers need to be in place in the marked locations on the Flexi-HAL for the Pi 
 These are shipped in place by default from the Expatria shop, but if they have been moved or removed they will need to be replaced. 
  
 
-### Support
+## Support
 
 Support is provided primarily through our Discord Server: https://discord.gg/bSEXy7GhcZ
 If you need help getting started or with configuration, please feel free to reach out there. 
+<br></br>
+## Original Sources
+
+This is based on the [rpi-img-builder](https://github.com/pyavitz/rpi-img-builder), which was then customized for [LinuxCNC](https://github.com/LinuxCNC/rpi-img-builder-lcnc), and finally modified for Flexi-HAL. 
 
 <br></br>
-<br></br>
-
 
 ---  
 
