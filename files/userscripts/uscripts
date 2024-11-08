@@ -92,8 +92,7 @@ cp vfdmod /usr/bin
 
 echo 'Cloning the remora-flexi hal repo and building flexi component'
 cd /home/expatria
-#git clone https://github.com/Expatria-Technologies/remora-flexi-hal.git remora-flexi-hal
-git clone http://192.168.10.227/mike/remora-flexi.git -b pi5 remora-flexi-hal
+git clone https://github.com/Expatria-Technologies/remora-flexi-hal.git remora-flexi-hal
 cd remora-flexi-hal/LinuxCNC/Components/Flexi/
 halcompile --install flexi.c
 mkdir /home/expatria/linuxcnc
