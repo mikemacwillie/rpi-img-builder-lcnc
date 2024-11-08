@@ -2,8 +2,8 @@ name: Build Pi Images
 
 on:
   workflow_dispatch:
-  #push:
-    #branches: [ "master" ]
+  push:
+    branches: [ "master" ]
     
 env:
   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
