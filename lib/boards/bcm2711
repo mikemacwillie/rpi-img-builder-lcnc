@@ -29,7 +29,7 @@ OUTPUT="output/${BOARD}"
 IMG_EXP="${BOARD_EXT}-*.img*"
 
 # cmdline
-CONSOLE="console=serial0,115200 console=tty1"
+CONSOLE="console=tty1"
 EXTRA="loglevel=5 net.ifnames=0 firmware_class.path=/lib/firmware/updates/brcm"
 # packaging
 KERNEL_IMG="kernel8.img"
