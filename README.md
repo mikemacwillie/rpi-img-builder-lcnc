@@ -21,6 +21,31 @@ A high-endurance SD card from a reputable manufacturer is recommended. The Sandi
 
 Also pre-installed in this image are the standard Remora-spi and Remora-eth-3.0 components. These are included on an as-is basis, but are updated with each image build. 
 
+### Booting the Pi 5 from an NVMe Drive
+
+If you wish to use an NVMe drive instead of an SD card, you will need to update the boot order in the Pi's EEPROM. You can do this from the Flexi-Pi image running on an SD card. To update the boot order in EEPROM:
+
+* Flash the Flexi-Pi image to an SD card
+* Insert the SD card into the Pi and boot
+* **Ensure the Pi has a stable source of power for this operation.**
+* Open a terminal and enter the command `sudo rpi-eeprom-config --edit`
+* Change the 'BOOT_ORDER' line to 'BOOT_ORDER=0xf416' to boot from NVMe first, and fall back to SD if not present.
+* Add 'PCIE_PROBE=1' to a new line below the 'BOOT_ORDER' line above
+* Exit the editor/save the file. The EEPROM will then program automatically.
+
+After editing your EEPROM config should contain:
+
+```
+[all]
+BOOT_UART=1
+POWER_OFF_ON_HALT=0
+BOOT_ORDER=0xf416
+PCIE_PROBE=1
+```
+
+You can then write the Flexi-Pi image to an NVMe drive using a USB NVMe Dock and your PC, or by downloading the image to the Pi while it is running from the SD card and writing it to your NVMe drive using `dd` or similar. 
+
+We suggest avoiding NVMe hats that install on or otherwise interfere with the GPIO pins. The [Pimoroni NVMe Base](https://shop.pimoroni.com/products/nvme-base) has been tested to work, and mounts to the underside of the Pi which works well with the Pi mounted on the Flexi-HAL.
 
 ## Flexi-HAL Configuration
 Jumpers need to be in place in the marked locations on the Flexi-HAL for the Pi to communicate with the MCU for firmware flashing:
