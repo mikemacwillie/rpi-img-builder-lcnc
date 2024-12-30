@@ -4,7 +4,7 @@ PASSWORD="expatria"
 ROOTPASSWD="0"
 
 ### LINUX KERNEL
-VERSION="6.1.y"
+VERSION="6.6.y"
 BUILD_VERSION="1"
 MENUCONFIG="0"
 COMPILER="gcc-12"
@@ -28,7 +28,7 @@ USER_PKGS="htop libsensors-dev xfce4 xfce4-terminal xfce4-power-manager geany fi
 
 ### CUSTOM LINUX KERNEL
 ENABLE_COMMIT="1"
-COMMIT="342c7ee49e862edc30c893f141f55b9211b7a43b"
+COMMIT="c1432b4bae5b6582f4d32ba381459f33c34d1424"
 
 ### COMPILER TUNING
 CORES=`nproc`
