@@ -358,7 +358,7 @@ index 4ebf2ef2845d..381c3be3bec1 100644
  	select MPIC
  	select OF_DYNAMIC
 diff --git a/arch/powerpc/platforms/pseries/iommu.c b/arch/powerpc/platforms/pseries/iommu.c
-index e8c4129697b1..c61e29deac8d 100644
+index b1e6d275cda9..9a8d3970da3c 100644
 --- a/arch/powerpc/platforms/pseries/iommu.c
 +++ b/arch/powerpc/platforms/pseries/iommu.c
 @@ -25,6 +25,7 @@
@@ -15400,11 +15400,11 @@ index 3b7d3e9eb6ea..5a4fefbc0856 100644
  		break;
 diff --git a/localversion-rt b/localversion-rt
 new file mode 100644
-index 000000000000..b72862e06be4
+index 000000000000..a68b4337d4ce
 --- /dev/null
 +++ b/localversion-rt
 @@ -0,0 +1 @@
-+-rt30
++-rt31
 diff --git a/net/core/dev.c b/net/core/dev.c
 index 1f6c8945f2ec..1e8928cd3c75 100644
 --- a/net/core/dev.c
@@ -15471,10 +15471,10 @@ index 1f6c8945f2ec..1e8928cd3c75 100644
  
  		init_gro_hash(&sd->backlog);
 diff --git a/net/core/skbuff.c b/net/core/skbuff.c
-index 60876262b3fb..02e2bab1ed8d 100644
+index f0a9ef1aeaa2..682175af439d 100644
 --- a/net/core/skbuff.c
 +++ b/net/core/skbuff.c
-@@ -6852,8 +6852,13 @@ nodefer:	__kfree_skb(skb);
+@@ -6863,8 +6863,13 @@ nodefer:	__kfree_skb(skb);
  	/* Make sure to trigger NET_RX_SOFTIRQ on the remote CPU
  	 * if we are unlucky enough (this seems very unlikely).
  	 */
