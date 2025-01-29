@@ -174,9 +174,11 @@ For SPI with a Pi connected directly to the Flexi-HAL:
 
 A git checkout of the Remora-flexi repository is present in the home directory. Update it before getting started to make sure you have the most recent version. Run 'git pull' from within the /home/expatria/remora-flexi-hal directory to update.
 
-Flash your Flexi with the current build of Remora by running the following command in a terminal:
+Connect 24V power to your Flexi-HAL and a suitable USB-C to your Raspberry Pi. Flash your Flexi with the current build of Remora by running the following command in a terminal:
 
 ~/flash_flexi ~/remora-flexi-hal/Firmware/FirmwareBin/FLEXIHAL/firmware.bin
+
+Do not connect anything to the USB-C port on the Flexi-HAL while flashing Remora over the GPIO header. Doing so may prevent the UART bootloader from functioning.
 
 A base PrintNC configuration is provided in the LinuxCNC config directory at /home/expatria/linuxcnc/configs/flexi-hal. Edit the INI with your machine configuration prior to attempting motion.
 This base configuration includes QtDragon_hd and vfdmod. vfdmod is configured for the Durapulse GS10 VFD, but the configuration can be changed fairly easily to suit a Modbus VFD.
