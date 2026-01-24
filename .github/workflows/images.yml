@@ -13,7 +13,7 @@ jobs:
     strategy:
       matrix:
         board: [bcm2712, bcm2711]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-24.04-arm
     steps:
     - name: Install toolchain
       run: |
@@ -46,7 +46,7 @@ jobs:
 
   create_release:
     needs: board_matrix
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Download artifacts from matrix
         uses: actions/download-artifact@v4
