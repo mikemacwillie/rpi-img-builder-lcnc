@@ -147,16 +147,16 @@ fi
 echo 'Populating the firmware directories'
 #Flexi-Ninja SPI
 curl -fsSL -o /home/${USERNAME}/firmware/flexi-ninja/Flexi-Ninja_FlexiHAL_2350_SPI.elf https://github.com/Expatria-Technologies/flexi-ninja/releases/latest/download/Flexi-Ninja_FlexiHAL_2350_SPI.elf
-curl -fsS https://api.github.com/repos/Expatria-Technologies/flexi-ninja/releases/latest | awk -F'"' '/"tag_name":/{t=$4} t && /"updated_at":/{print t; print $4; exit}' > /home/${USERNAME}/firmware/flexi-ninja/Flexi-Ninja_FlexiHAL_2350_SPI.elf.version
+curl -fsS https://api.github.com/repos/Expatria-Technologies/flexi-ninja/releases/latest | awk -F'"' '/"tag_name":/{t=$4} t && /"updated_at":/{print t; print $4; exit}' > /home/${USERNAME}/firmware/flexi-ninja/Flexi-Ninja_FlexiHAL_2350_SPI.elf.version || true
 #Flexi-Ninja Ethernet
 curl -fsSL -o /home/${USERNAME}/firmware/flexi-ninja/Flexi-Ninja_FlexiHAL_2350_W5500.elf https://github.com/Expatria-Technologies/flexi-ninja/releases/latest/download/Flexi-Ninja_FlexiHAL_2350_W5500.elf
-curl -fsS https://api.github.com/repos/Expatria-Technologies/flexi-ninja/releases/latest | awk -F'"' '/"tag_name":/{t=$4} t && /"updated_at":/{print t; print $4; exit}' > /home/${USERNAME}/firmware/flexi-ninja/Flexi-Ninja_FlexiHAL_2350_W5500.elf.version
+curl -fsS https://api.github.com/repos/Expatria-Technologies/flexi-ninja/releases/latest | awk -F'"' '/"tag_name":/{t=$4} t && /"updated_at":/{print t; print $4; exit}' > /home/${USERNAME}/firmware/flexi-ninja/Flexi-Ninja_FlexiHAL_2350_W5500.elf.version || true
 # FlexGPIO Bootloader
 curl -fsSL -o /home/${USERNAME}/firmware/flexgpio_bootloader/FlexGPIO_bootloader.elf https://github.com/Expatria-Technologies/FlexGPIO_Bootloader/releases/latest/download/FlexGPIO_bootloader.elf
-curl -fsS https://api.github.com/repos/Expatria-Technologies/FlexGPIO_Bootloader/releases/latest | awk -F'"' '/"tag_name":/{t=$4} t && /"updated_at":/{print t; print $4; exit}' > /home/${USERNAME}/firmware/flexgpio_bootloader/FlexGPIO_bootloader.elf.version
+curl -fsS https://api.github.com/repos/Expatria-Technologies/FlexGPIO_Bootloader/releases/latest | awk -F'"' '/"tag_name":/{t=$4} t && /"updated_at":/{print t; print $4; exit}' > /home/${USERNAME}/firmware/flexgpio_bootloader/FlexGPIO_bootloader.elf.version || true
 # Remora Flex-HAL
 curl -fsSL -o /home/${USERNAME}/firmware/remora-flexi-hal/Remora-Flex-Hal_v1.0.0.bin https://github.com/Expatria-Technologies/remora-flexi-hal/releases/latest/download/Remora-Flex-Hal_v1.0.0.bin
-curl -fsS https://api.github.com/repos/Expatria-Technologies/remora-flexi-hal/releases/latest | awk -F'"' '/"tag_name":/{t=$4} t && /"updated_at":/{print t; print $4; exit}' > /home/${USERNAME}/firmware/remora-flexi-hal/Remora-Flex-Hal_v1.0.0.bin.version
+curl -fsS https://api.github.com/repos/Expatria-Technologies/remora-flexi-hal/releases/latest | awk -F'"' '/"tag_name":/{t=$4} t && /"updated_at":/{print t; print $4; exit}' > /home/${USERNAME}/firmware/remora-flexi-hal/Remora-Flex-Hal_v1.0.0.bin.version || true
 
 
 echo 'Installing RPi OpenOCD for board flashing'
