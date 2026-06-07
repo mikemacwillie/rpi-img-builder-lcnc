@@ -3,7 +3,7 @@
 
 ## Flexi-Pi
 
-Flexi-Pi is a custom configured LinuxCNC image for use with the [Flexi-HAL](https://github.com/Expatria-Technologies/Flexi-HAL) CNC controller and Remora firmware.The Flexi LinuxCNC components are pre-installed along with all of their dependencies, and reference configurations are included to get you started. **You will need to edit these configurations for your specific machine before attempting motion.** The base configuration runs QtDragon_hd as the default supported UI. 
+Flexi-Pi is a custom configured LinuxCNC image for use with the [Flexi-HAL](https://github.com/Expatria-Technologies/Flexi-HAL) and [FlexiHAL 2350](https://github.com/Expatria-Technologies/FlexiHAL_2350) CNC controllers. The LinuxCNC components required for both boards are pre-installed along with all of their dependencies. Reference configurations are included to get you started. **You will need to edit these configurations for your specific machine before attempting motion.** The base configuration runs QtDragon_hd as the default supported UI, which requires a 1080p display. 
 
 Both the Raspberry Pi 5 and Raspberry Pi 4 are currently supported. Performance is significantly better with a Pi 5, however the Pi 4 image here performs better than the previous releases. 
 
@@ -12,18 +12,18 @@ Both the Raspberry Pi 5 and Raspberry Pi 4 are currently supported. Performance 
   https://github.com/Expatria-Technologies/Flexi-Pi/releases
 * Extract the image archive
 * Flash the image to an an 8GB or larger SD card using dd, balenaEtcher, or the tool of your choice. The filesystem will be automatically resized on first boot to fill the entirety of the SD card.
-* Install the Pi onto the Flexi-HAL headers and insert the SD card into the Pi.
-* Ensure the jumpers are set as shown in the Flexi-HAL Configuration section of this README
-* Connect your display, keyboard, etc. to the Pi
-* Connect power to the Pi/Flexi-HAL and boot the OS
-* Read the contents of the README present on the desktop for instructions specific to the image used. This includes some hints on flashing your Flexi-HAL with the Remora firmware, and starting LinuxCNC.
+* Install the Pi onto the Flexi-HAL headers and insert the SD card into the Pi. You will need to use an extension header if you are using a cooler. 
+* If you are using a Flexi-HAL, ensure the jumpers are set as shown in the Flexi-HAL Configuration section of this README.
+* Connect your display, keyboard, etc. to the Pi.
+* Connect power to the Pi/Flexi-HAL and boot the OS.
+* Read the contents of the README present on the desktop for instructions specific to the image used. This includes details on flashing firmware for your board and starting LinuxCNC.
 
 The default username and password are both `expatria`.
 
 A high-endurance SD card from a reputable manufacturer is recommended. The Sandisk U3 High Endurance cards have performed well in our testing. Select a card with a high read/write speed for the best performance. 
 
 
-Also pre-installed in this image are the standard Remora-spi and Remora-eth-3.0 components. These are included on an as-is basis, but are updated with each image build. 
+While not directly used by our boards, also pre-installed in this image are the standard Remora-spi and Remora-eth-3.0 components. These are included on an as-is basis, but are updated with each image build. If we have missed an update and you'd like to use this image, please let us know and we will update them as needed.
 
 ### Booting the Pi 5 from an NVMe Drive
 
@@ -63,75 +63,95 @@ To provide sufficient clearance for a cooler on a Pi 5, a 40-pin female header c
  
 ## Getting started with LinuxCNC:
 
-#### For SPI with a Pi connected directly to the Flexi-HAL: 
+Connect 24V power to your board and a suitable USB-C to your Raspberry Pi. Do not connect anything to the USB-C port on the board while flashing over the GPIO header. Doing so may prevent the bootloader from functioning.
 
-A git checkout of the Remora-flexi repository is present in the home directory. Update it before getting started to make sure you have the most recent version. Run 'git pull' from within the /home/expatria/remora-flexi-hal directory to update.
+### Flashing Firmware
 
-Connect 24V power to your Flexi-HAL and a suitable USB-C to your Raspberry Pi. Do not connect anything to the USB-C port on the Flexi-HAL while flashing Remora over the GPIO header. Doing so may prevent the UART bootloader from functioning. 
+Use the `flash_firmware` script to flash firmware on either board. It will detect your hardware and guide you through the process. The script will check for updated releases and prompt you to download them if desired.
 
-Flash your Flexi with the current build of Remora by running the following command in a terminal:
+For **FlexiHAL 2350** (Flexi-Ninja firmware):
+  - Flashes the RP2350 main firmware over SWD via the Pi GPIO header
+  - Optionally flashes the RP2040 FlexGPIO bootloader over SWD
+  - Optionally nukes the flash on both the RP2350 and RP2040 prior to programming. If you had a previous configuration in flash, this may be helpful in ensuring you start from scratch.
 
-`~/flash_flexi ~/remora-flexi-hal/Firmware/FirmwareBin/FLEXIHAL/firmware.bin`
+For **Flexi-HAL** (STM32F4):
+  - Flashes the STM32F4 over UART via the Pi GPIO header
 
-The output should look similar to the following:
-```
-Entering bootloader...
-stm32flash 0.7
+---
 
-http://stm32flash.sourceforge.net/
+### Reference Configurations
 
-Using Parser : Raw BINARY
-Size         : 150776
-Interface serial_posix: 115200 8E1
-Version      : 0x31
-Option 1     : 0x00
-Option 2     : 0x00
-Device ID    : 0x0421 (STM32F446xx)
-- RAM        : Up to 128KiB  (12288b reserved by bootloader)
-- Flash      : Up to 512KiB (size first sector: 1x16384)
-- Option RAM : 16b
-- System RAM : 30KiB
-Write to memory
-Erasing memory
-Wrote address 0x08024cf8 (100.00%) Done.
+#### Flexi-HAL (SPI)
 
-Resetting board...
-Done!
-```
-If there is a `Failed to init device.` response, there has been an error flashing the firmware which will need to be resolved before proceeding. 
+  `~/linuxcnc/configs/flexi-hal/`
 
-A base PrintNC configuration is provided in the LinuxCNC config directory at `/home/expatria/linuxcnc/configs/flexi-hal`. **Edit the INI with your machine configuration prior to attempting motion.** This base configuration includes QtDragon_hd and vfdmod; vfdmod is configured for the Durapulse GS10 VFD, but the configuration can be changed fairly easily to suit a Modbus VFD. A sample HAL configuration for the HY VFD is included in the reference config, commented out. There are comments in the HAL file to detail what to uncomment/comment out. 
+  A base PrintNC configuration is provided. Edit the INI with your machine configuration prior to attempting motion. This base configuration includes QtDragon_hd and vfdmod; vfdmod is configured for the Durapulse GS10 VFD, but can be changed to suit any Modbus VFD. A sample HAL configuration for the HY VFD is included, commented out.
 
-#### For Ethernet via uFlexinet: 
+#### FlexiHAL 2350 (SPI)
 
-The `remora-eth` component is pre-installed in this image. Also included is a reference configuration for use with the uFlexiNet in the LinuxCNC config directory at `/home/expatria/linuxcnc/configs/uFlexiNet`. You will need upload your configuration file to the FlexiHAL using the `upload_config.py` script that should be in your configuration folder:
+  `~/linuxcnc/configs/flexi-ninja/`
 
-`python3 upload_config.py FlexiHAL-config.txt`
+  This is a QtDragon HD based configuration, similar to the PrintNC configuration provided for the Flexi-HAL. Edit `flexi-ninja.ini` for your machine configuration before attempting motion. This base configuration includes QtDragon_hd and vfdmod; vfdmod is configured for the Durapulse GS10 VFD, but can be changed to suit any Modbus VFD. A sample HAL configuration for the HY VFD is included, commented out.
 
-To use the RS485 interface on the FlexiHAL via the uFlexiNet you can set up a virtual serial port and use socat to bridge between userspace Modbus components and Remora. If the RS485 component is included in the board config txt, it will listen on port 27183 for UDP packets and forward them to the RS485 port: 
+  New options vs. the Flexi-HAL firmware:
+  - Stepgen pulse width is configurable via `flexi-ninja.stepgen.pulse-width`
+  - DIR setup timing is configurable per axis via `flexi-ninja.stepgen.{N}.dir-setup`
+  - Two encoders: ENC1 (high-speed PIO-based) and ENC2 (IRQ-based, can be disabled to free its pins as AUXIN0-2)
+  - FlexGPIO I/O expander firmware is loaded to RAM at startup; no configuration needed
+  - Full README: https://github.com/Expatria-Technologies/flexi-ninja
 
-`socat pty, link=/tmp/virtualcom0, raw udp:10.10.10.10:27183 &`
+#### FlexiHAL 2350 (Ethernet)
 
-More information on the Ethernet implmentation can be found in the README in the repository: https://github.com/Expatria-Technologies/Remora-STM32F4xx-W5500
+  `~/linuxcnc/configs/flexi-ninja-eth/`
 
-#### Autostarting LinuxCNC on boot:
-
-If you'd like to autostart LinuxCNC on boot after configuring your machine, add `linuxcnc -l` to 'Application Autostart' in the 'Session and Startup' menu to automatically load the configuration you last selected in the LinuxCNC selection window. 
+  Same configuration as SPI but communicates over Ethernet. The board is reachable at `192.168.5.1` as configured in the reference config.
 
 
+#### uFlexiNet (Ethernet for Flexi-HAL)
+
+  `~/linuxcnc/configs/uFlexiNet/`
+
+  The remora-eth component is pre-installed. Upload your configuration file to the FlexiHAL using `upload_config.py` from your config folder:
+
+    python3 upload_config.py FlexiHAL-config.txt
+
+  To use the RS485 interface on the FlexiHAL via uFlexiNet, set up a virtual serial port with socat:
+
+    socat pty, link=/tmp/virtualcom0, raw udp:10.10.10.10:27183 &
+
+  More information is available at:
+  https://github.com/Expatria-Technologies/Remora-STM32F4xx-W5500
+
+---
+
+### Ethernet Connectivity
+
+The image is configured for DHCP on eth0 by default, with secondary static IP addresses of `192.168.5.2/24` for FlexiHAL 2350 Ethernet communication and `10.10.10.2/24` for Remora uFlexiNet. These can remain present regardless of which board you are using, and won't need changing unless you need a different default network config. Network configurations (including wifi) can be managed with `menu-config`.
+
+---
+
+### Autostart LinuxCNC
+
+If you'd like to autostart LinuxCNC on boot after configuring your machine, add `linuxcnc -l` to 'Application Autostart' in the 'Session and Startup' menu to automatically load the configuration you last selected in the LinuxCNC selection window.
+
+---
 
 ## Support
 
-Support is provided primarily through our Discord Server: https://discord.gg/bSEXy7GhcZ
-If you need help getting started or with configuration, please feel free to reach out there. 
-<br></br>
+Support is provided primarily through our Discord Server: https://discord.gg/bSEXy7GhcZ. If you need help getting started or with configuration, please feel free to reach out there. 
+
+---
+
 ## Original Sources
 
-This is based on the [rpi-img-builder](https://github.com/pyavitz/rpi-img-builder), which was then customized for [LinuxCNC](https://github.com/LinuxCNC/rpi-img-builder-lcnc), and finally modified for Flexi-HAL. 
-
-<br></br>
+This is based on the [rpi-img-builder](https://github.com/pyavitz/rpi-img-builder), which was then customized for [LinuxCNC](https://github.com/LinuxCNC/rpi-img-builder-lcnc), and finally modified for Flexi-HAL and FlexiHAL 2350. 
 
 ---  
+
+## System Menu: `menu-config`
+
+<img src="https://i.imgur.com/vwFVBzF.png" alt="Main Menu" />  
+
 
 ## Re-configuring and Building on Ubuntu 24.04:
 
@@ -149,7 +169,6 @@ This is based on the [rpi-img-builder](https://github.com/pyavitz/rpi-img-builde
 
 ```sh
 make ccompile # Install x86-64 dependencies
-
 make ncompile # Install Aarch64 dependencies
 ```
 
@@ -169,9 +188,7 @@ make image board=bcm2712 # build image for Pi 5
 ```sh
 
 make config # Create user data file
-
 make menu # Open menu interface
-
 make dialogrc # Set builder theme (optional)
 
 ```
@@ -185,19 +202,13 @@ make dialogrc # Set builder theme (optional)
 ```sh
 
 make list # List boards
-
 make all board=xxx # Kernel > rootfs > image
-
 make kernel board=xxx # Builds linux kernel package
-
 make commit board=xxx # Builds linux kernel package
-
 make rootfs board=xxx # Create rootfs tarball
-
 make image board=xxx # Make bootable image
 
 ```
-
   
 
 #### Miscellaneous
@@ -205,257 +216,12 @@ make image board=xxx # Make bootable image
   
 
 ```sh
-
 make clean # Clean up rootfs and image errors
-
 make purge # Remove source directory
-
 make purge-all # Remove source and output directory
-
 make commands # List more commands
-
 make check # Shows latest revision of selected branch
 
 ```
-
-  
-
-#### Config Menu
-
-* Review the userdata.txt file for further options: locales, timezone, nameserver(s) and extra wireless support
-
-* 1 active | 0 inactive
-
-```sh
-
-Name: # Your name
-
-Username: # Your username
-
-Password: # Your password
-
-Enable root: # Set root password to `toor`
-
-  
-
-Linux kernel
-
-Branch: # Supported: 6.1.y and above
-
-Build: # Kernel build version number
-
-Menuconfig: # Kernel menuconfig
-
-Compiler: # GNU Compiler Collection / Clang
-
-Ccache: # Compiler cache
-
-  
-
-Distribution
-
-Distro: # Supported: debian, others untested
-
-Release: # Debian: bullseye, bookworm, testing, unstable and sid
-
-# Devuan: chimaera and daedalus (broken: excalibur, testing, unstable, ceres)
-
-# https://www.devuan.org/os/announce/excalibur-usrmerge-announce-2024-02-20.html
-
-# Ubuntu: focal, jammy and noble
-
-NetworkManager # 1 networkmanager | 0 ifupdown
-
-  
-
-Customize
-
-Defconfig: # User defconfig
-
-Name: # Name of _defconfig (Must be placed in defconfig dir.)
-
-  
-
-User options
-
-Verbosity: # Verbose
-
-Devel Rootfs: # Developer rootfs tarball
-
-Compress img: # Auto compress img > img.xz
-
-User scripts: # Review the README in the files/userscripts directory
-
-User service: # Create user during first boot (bypass the user information above)
-
-```
-
-  
-
-#### Customize image
-
-* custom.txt
-
-```sh
-
-# Image Size
-
-IMGSIZE="4096MB"
-
-  
-
-# Root Filesystem Types: ext4 btrfs xfs
-
-FSTYPE="ext4"
-
-  
-
-# Shrink Image
-
-SHRINK="true"
-
-  
-
-# Hostname
-
-HOSTNAME="raspberrypi"
-
-  
-
-# Branding: true false
-
-BRANDING="false"
-
-MOTD="Raspberry Pi"
-
-```
-
-  
-
-#### User defconfig
-
-```sh
-
-# Config placement: defconfig/$NAME_defconfig
-
-The config menu will append _defconfig to the end of the name
-
-in the userdata.txt file.
-
-```
-
-  
-
-#### User patches
-
-  
-
-```sh
-
-Patches "-p1" placed in userpatches are applied during compilation.
-
-```
-
-  
-
-#### Preferred commit
-
-```sh
-
-# Example
-
-ENABLE_COMMIT="1"
-
-COMMIT="9ed4f05ba2e2bcd9065831674e97b2b1283e866d"
-
-```
-
-  
-
-### Usage
-
-* Review the [Wiki](https://github.com/pyavitz/rpi-img-builder/wiki/Options-&-Scripts)
-
-* The boot partition is labelled BOOT
-
-#### BOOT: useraccount.txt
-
-* Headless: ENABLE="true" and fill in the variables (recommended)
-
-* Headful: ENABLE="false" and get prompted to create a user account
-
-```sh
-
-ENABLE="false" # Set to true to enable service
-
-NAME="" # Your name
-
-USERNAME="" # Username
-
-PASSWORD="" # Password
-
-```
-
-  
-
-#### BOOT: credentials.txt
-
-```sh
-
-Set to ENABLE="true" and input your wifi information.
-
-ENABLE="false" # Enable service
-
-  
-
-SSID="" # Service set identifier
-
-PASSKEY="" # Wifi password
-
-COUNTRYCODE="" # Your country code
-
-  
-
-# set static ip (ifupdown)
-
-MANUAL="false" # Set to true to enable a static ip
-
-IPADDR="" # Static ip address
-
-NETMASK="" # Your Netmask
-
-GATEWAY="" # Your Gateway
-
-NAMESERVERS="" # Your preferred dns
-
-  
-
-# set static ip (network-manager)
-
-MANUAL="false" # Set to true to enable a static ip
-
-IPADDR="" # Static ip address
-
-GATEWAY="" # Your Gateway
-
-DNS="" # Your preferred dns
-
-  
-
-# change hostname
-
-HOSTNAME="raspberrypi" # Hostname
-
-  
-
-For headless use: ssh user@ipaddress
-
-```
-
-#### System Menu: `menu-config`
-
-<img src="https://i.imgur.com/vwFVBzF.png" alt="Main Menu" />
-
-  
 
 ---

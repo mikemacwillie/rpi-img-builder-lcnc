@@ -135,6 +135,8 @@ cp files/misc/* p2/root
 cp files/scripts/* p2/root
 cp files/users/* p2/root
 cp files/firmware/* p2/root
+cp files/flash-tools/* p2/root
+cp -r files/home p2/root/homedir
 if [ $USERACCT -eq 1 ]; then
 	mkdir -p p2/root/useracct
 	cp -r files/useracct/* p2/root/useracct

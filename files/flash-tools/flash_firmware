@@ -1,0 +1,634 @@
+#!/bin/bash
+set -euo pipefail
+
+# ============================================================================
+# flash_firmware - Interactive firmware flasher for FlexiHAL boards
+#
+# Supports:
+#   FlexiHAL 2350 (RP2350) via OpenOCD over SWD
+#   RP2040 (FlexGPIO Bootloader) via OpenOCD over SWD
+#   FlexiHAL (STM32F4) via stm32flash over UART
+#
+# ============================================================================
+
+# ===== DEFAULTS =====
+TCL_DIR_DEFAULT="/usr/local/share/openocd/scripts"
+
+# Release source definitions
+REPO_FLEXI_NINJA="Expatria-Technologies/flexi-ninja"
+REPO_FLEXGPIO_BL="Expatria-Technologies/FlexGPIO_Bootloader"
+REPO_REMORA="Expatria-Technologies/remora-flexi-hal"
+
+ASSET_RP2350_SPI="Flexi-Ninja_FlexiHAL_2350_SPI.elf"
+ASSET_RP2350_W5500="Flexi-Ninja_FlexiHAL_2350_W5500.elf"
+ASSET_BOOTLOADER="FlexGPIO_bootloader.elf"
+ASSET_STM32="Remora-Flex-Hal_v1.0.0.bin"
+
+CACHE_DIR="$HOME/.cache/flexi-ninja/releases"
+
+DEBUG=false
+
+NUKE_2040="$HOME/firmware/nuke/flash_nuke_2040.elf"
+NUKE_2350="$HOME/firmware/nuke/flash_nuke_2350.elf"
+
+# ===== PLATFORM DETECTION =====
+detect_platform() {
+    local hex base peri
+    if command -v xxd &>/dev/null; then
+        hex=$(xxd -p -l 16 /proc/device-tree/soc/ranges 2>/dev/null)
+    else
+        hex=$(od -A n -t x1 -N 16 /proc/device-tree/soc/ranges 2>/dev/null | tr -d ' \n')
+    fi
+    hex=${hex%%$'\n'*}
+    if [[ ${#hex} -lt 16 ]]; then
+        echo "unknown"
+        return
+    fi
+    base=$((16#${hex:8:8}))
+    peri=$((16#${hex:16:8}))
+    if [[ $base -eq 0 ]]; then
+        base=$((16#${hex:16:8}))
+        peri=$((16#${hex:24:8}))
+    fi
+    if [[ $base -eq 0xFE000000 ]]; then
+        echo "pi4"
+    elif [[ $peri -eq 0x7C000000 ]]; then
+        echo "pi5"
+    else
+        echo "unknown"
+    fi
+}
+
+get_rp1_gpio_base() {
+    for chipdir in /sys/class/gpio/gpiochip*/; do
+        local label
+        label=$(cat "${chipdir}label" 2>/dev/null)
+        if [[ "$label" == *rp1* || "$label" == *RP1* ]]; then
+            cat "${chipdir}base" 2>/dev/null
+            return
+        fi
+    done
+}
+
+find_gpiochip_for_pin() {
+    local pin="$1"
+    for chip in gpiochip4 gpiochip3 gpiochip2 gpiochip1 gpiochip0; do
+        [ -e "/dev/$chip" ] || continue
+        if gpioinfo "$chip" 2>/dev/null | grep -Eq "(^|[[:space:]])$pin:"; then
+            echo "$chip"
+            return 0
+        fi
+    done
+    return 1
+}
+
+# ===== ANSI HELPERS =====
+green()  { printf "\033[32m%s\033[0m" "$*"; }
+yellow() { printf "\033[33m%s\033[0m" "$*"; }
+red()    { printf "\033[31m%s\033[0m" "$*"; }
+
+check_cmd() { command -v "$1" &>/dev/null; }
+
+verbose() {
+    $DEBUG || return 0
+    echo "$@"
+}
+
+# ===== RELEASE DOWNLOAD HELPERS =====
+fetch_release_asset() {
+    local repo="$1" asset="$2" dest_dir="$3"
+    local dest="$dest_dir/$asset"
+    local version_file="$dest_dir/$asset.version"
+    local api_cache="$CACHE_DIR/$(echo "$repo" | tr '/' '_')/latest.json"
+
+    # Refresh API cache every 5 minutes
+    local fetch_api=true
+    if [[ -f "$api_cache" ]]; then
+        local age
+        age=$(($(date +%s) - $(stat -c %Y "$api_cache" 2>/dev/null || echo 0)))
+        [[ $age -lt 300 ]] && fetch_api=false
+    fi
+
+    # Fetch or read cached release info
+    local remote_tag="" remote_updated=""
+    if $fetch_api; then
+        mkdir -p "$(dirname "$api_cache")"
+        local json
+        json=$(curl -fsS "https://api.github.com/repos/$repo/releases/latest" 2>/dev/null) && {
+            echo "$json" > "$api_cache"
+            remote_tag=$(echo "$json" | grep -o '"tag_name":[[:space:]]*"[^"]*"' | head -1 | cut -d'"' -f4 2>/dev/null) || true
+            remote_updated=$(echo "$json" | grep -o '"updated_at":[[:space:]]*"[^"]*"' | head -1 | cut -d'"' -f4 2>/dev/null) || true
+        }
+    elif [[ -f "$api_cache" ]]; then
+        local json
+        json=$(<"$api_cache")
+        remote_tag=$(echo "$json" | grep -o '"tag_name":[[:space:]]*"[^"]*"' | head -1 | cut -d'"' -f4 2>/dev/null) || true
+        remote_updated=$(echo "$json" | grep -o '"updated_at":[[:space:]]*"[^"]*"' | head -1 | cut -d'"' -f4 2>/dev/null) || true
+    fi
+
+    # Read local version info
+    local local_tag="" local_updated=""
+    if [[ -f "$version_file" ]]; then
+        IFS= read -r local_tag < "$version_file"
+        IFS= read -r local_updated < <(tail -n +2 "$version_file" 2>/dev/null)
+    elif [[ -f "$dest" ]]; then
+        local_updated=$(date -u -d "@$(stat -c %Y "$dest")" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null) || true
+    fi
+
+    # Check whether to download (missing file) or update (newer release)
+    local has_content=false
+    if [[ -f "$dest" ]]; then
+        has_content=true
+    elif [[ -d "$dest_dir" ]] && [[ -n "$(find "$dest_dir" -maxdepth 1 -type f ! -name '*.version' -print -quit 2>/dev/null)" ]]; then
+        has_content=true
+        # Try to read version from any existing .version file
+        local existing_version_file
+        existing_version_file=$(find "$dest_dir" -maxdepth 1 -name "*.version" -print -quit 2>/dev/null)
+        if [[ -f "$existing_version_file" ]]; then
+            IFS= read -r local_tag < "$existing_version_file"
+            IFS= read -r local_updated < <(tail -n +2 "$existing_version_file" 2>/dev/null)
+        fi
+    fi
+
+    local should_download=false reason=""
+    if $has_content; then
+        # Check if existing file has a different name than the expected asset
+        local existing_name=""
+        local existing_file_check
+        existing_file_check=$(find "$dest_dir" -maxdepth 1 -type f ! -name "*.version" -print -quit 2>/dev/null)
+        [[ -n "$existing_file_check" ]] && existing_name="${existing_file_check##*/}"
+
+        if [[ -n "$remote_tag" && ( "$existing_name" != "$asset" || ( -n "$local_tag" && "$remote_tag" != "$local_tag" ) || "$remote_updated" != "$local_updated" ) ]]; then
+            local tag_msg="${remote_tag:+ ($remote_tag)}"
+            echo >&2 "  New version available: $asset$tag_msg"
+            if confirm "  Download and update?"; then
+                should_download=true
+                reason="update ($remote_tag)"
+            fi
+        fi
+    else
+        should_download=true
+        reason="new download"
+    fi
+
+    if $should_download; then
+        echo >&2 "  Downloading $asset..."
+        mkdir -p "$dest_dir"
+        local url="https://github.com/$repo/releases/latest/download/$asset"
+        if curl -fsSL -o "$dest" "$url"; then
+            echo "${remote_tag:-downloaded}" > "$version_file"
+            echo "${remote_updated:-}" >> "$version_file"
+            echo "$dest"
+            return 0
+        fi
+        echo >&2 "  Download failed"
+    fi
+
+    if [[ -f "$dest" ]]; then
+        echo "$dest"
+        return 0
+    fi
+
+    # No exact match — return any existing firmware file in the directory
+    local existing_file
+    existing_file=$(find "$dest_dir" -maxdepth 1 -type f ! -name "*.version" -print -quit 2>/dev/null)
+    if [[ -n "$existing_file" ]]; then
+        echo "$existing_file"
+        return 0
+    fi
+
+    echo ""
+    return 1
+}
+
+resolve_firmware() {
+    local board_dir="$1" repo="$2" asset="$3"
+    local dest_dir="$HOME/firmware/$board_dir"
+    fetch_release_asset "$repo" "$asset" "$dest_dir"
+}
+
+# ===== PROMPT HELPERS =====
+prompt_firmware() {
+    local prompt="$1" default="$2"
+    local default_expanded="${default/#\~/$HOME}"
+    read -rei "$default_expanded" -p "  Firmware file for $prompt: " input
+    if [[ -z "$input" ]]; then
+        echo "$default_expanded"
+    else
+        input="${input/#\~/$HOME}"
+        echo "$input"
+    fi
+}
+
+confirm() {
+    local reply
+    read -r -p "$1 [y/N] " reply
+    [[ "$reply" =~ ^[Yy] ]]
+}
+
+# ===== GPIO CLEANUP =====
+cleanup_flash_pins() {
+    local pin="$1"
+    local chip
+    chip=$(find_gpiochip_for_pin "$pin") || return
+    gpioget "$chip" "$pin" > /dev/null 2>&1 || true
+}
+
+# ===== OPENOCD FLASH TARGET =====
+flash_target() {
+    local firmware="$1"
+    local target_cfg="$2"
+    local swdio="$3"
+    local swclk="$4"
+    local label="$5"
+    local nuke_mode="${6:-false}"
+
+    echo ""
+    echo "--- Flashing $label ---"
+    echo "  Target:  $target_cfg (SWDIO=$swdio SWCLK=$swclk)"
+    echo "  Firmware: $firmware"
+
+    if [[ ! -f "$firmware" ]]; then
+        echo "Error: firmware not found: $firmware"
+        return 1
+    fi
+
+    local tcl
+    tcl=$(realpath "$TCL_DIR")
+
+    if $nuke_mode; then
+        local entry
+        entry=$(readelf -h "$firmware" 2>/dev/null | awk '/Entry point/ {print $4}')
+        if [[ -z "$entry" ]]; then
+            echo "Error: could not parse entry point from ELF"
+            return 1
+        fi
+        echo "  Entry point: $entry"
+    fi
+
+    case "$PLATFORM" in
+        pi4)
+            if $nuke_mode; then
+                openocd -s "$tcl" \
+                    -f "interface/raspberrypi-native.cfg" \
+                    -c "transport select swd" \
+                    -c "adapter gpio swdio -chip 0 $swdio" \
+                    -c "adapter gpio swclk -chip 0 $swclk" \
+                    -c "adapter speed 1000" \
+                    -f "$target_cfg" \
+                    -c "init" \
+                    -c "halt" \
+                    -c "load_image $firmware" \
+                    -c "resume $entry" \
+                    -c "shutdown"
+            else
+                openocd -s "$tcl" \
+                    -f "interface/raspberrypi-native.cfg" \
+                    -c "transport select swd" \
+                    -c "adapter gpio swdio -chip 0 $swdio" \
+                    -c "adapter gpio swclk -chip 0 $swclk" \
+                    -c "adapter speed 1000" \
+                    -f "$target_cfg" \
+                    -c "program $firmware verify reset exit"
+            fi
+            ;;
+        pi5)
+            local swdio_g=$((RP1_GPIO_BASE + swdio))
+            local swclk_g=$((RP1_GPIO_BASE + swclk))
+            if $nuke_mode; then
+                openocd -s "$tcl" \
+                    -c "adapter driver sysfsgpio" \
+                    -c "sysfsgpio swclk_num $swclk_g" \
+                    -c "sysfsgpio swdio_num $swdio_g" \
+                    -c "transport select swd" \
+                    -c "adapter speed 1000" \
+                    -f "$target_cfg" \
+                    -c "init" \
+                    -c "halt" \
+                    -c "load_image $firmware" \
+                    -c "resume $entry" \
+                    -c "shutdown"
+            else
+                openocd -s "$tcl" \
+                    -c "adapter driver sysfsgpio" \
+                    -c "sysfsgpio swclk_num $swclk_g" \
+                    -c "sysfsgpio swdio_num $swdio_g" \
+                    -c "transport select swd" \
+                    -c "adapter speed 1000" \
+                    -f "$target_cfg" \
+                    -c "program $firmware verify reset exit"
+            fi
+            ;;
+    esac
+
+    echo "   $label done"
+}
+
+# ===== FLEXIHAL 2350 FLASH =====
+flash_flexihal_2350() {
+    echo "============================================"
+    echo "  FlexiHAL 2350"
+    echo "============================================"
+
+    # Variant selection
+    echo ""
+    echo "Select variant:"
+    echo "  1) SPI"
+    echo "  2) Ethernet"
+    read -r -p "Choice [1/2]: " variant_choice
+
+    local asset variant_name
+    case "$variant_choice" in
+        1) asset="$ASSET_RP2350_SPI";  variant_name="SPI"     ;;
+        2) asset="$ASSET_RP2350_W5500"; variant_name="Ethernet" ;;
+        *) echo "Invalid choice"; return 1 ;;
+    esac
+
+    # Nuke prompt
+    if confirm "Nuke flash RP2350 before programming?"; then
+        if [[ -f "$NUKE_2350" ]]; then
+            echo ""
+            echo "=== Nuking RP2350 ==="
+            flash_target "$NUKE_2350" "target/rp2350.cfg" 23 24 "RP2350 (nuke)" true || return 1
+        else
+            echo "Warning: nuke ELF not found - skipping nuke."
+            echo "  Expected: $NUKE_2350"
+        fi
+    fi
+
+    # Firmware prompt
+    local default_path
+    default_path=$(resolve_firmware "flexi-ninja" "$REPO_FLEXI_NINJA" "$asset") || true
+
+    echo ""
+    rp2350_elf=$(prompt_firmware "RP2350 ($variant_name)" "$default_path")
+
+    # Flash
+    echo ""
+    echo "=== Flashing RP2350 ==="
+    flash_target "$rp2350_elf" "target/rp2350.cfg" 23 24 "RP2350 (stepper-ninja)" false || return 1
+
+    # GPIO cleanup
+    cleanup_flash_pins 23
+    cleanup_flash_pins 24
+
+    echo ""
+    echo "  FlexiHAL 2350 flash complete"
+}
+
+# ===== FLEXGPIO BOOTLOADER FLASH (RP2040) =====
+flash_flexgpio_bootloader() {
+    echo "============================================"
+    echo "  FlexGPIO Bootloader (RP2040)"
+    echo "============================================"
+
+    # Nuke prompt
+    if confirm "Nuke flash RP2040 before programming?"; then
+        if [[ -f "$NUKE_2040" ]]; then
+            echo ""
+            echo "=== Nuking RP2040 ==="
+            flash_target "$NUKE_2040" "target/rp2040.cfg" 6 13 "RP2040 (nuke)" true || return 1
+        else
+            echo "Warning: nuke ELF not found - skipping nuke."
+            echo "  Expected: $NUKE_2040"
+        fi
+    fi
+
+    # Firmware prompt
+    local default_path
+    default_path=$(resolve_firmware "flexgpio_bootloader" "$REPO_FLEXGPIO_BL" "$ASSET_BOOTLOADER") || true
+
+    echo ""
+    bootloader_elf=$(prompt_firmware "RP2040 (FlexGPIO Bootloader)" "$default_path")
+
+    # Flash
+    echo ""
+    echo "=== Flashing RP2040 ==="
+    flash_target "$bootloader_elf" "target/rp2040.cfg" 6 13 "RP2040 (FlexGPIO Bootloader)" false || return 1
+
+    # GPIO cleanup
+    cleanup_flash_pins 6
+    cleanup_flash_pins 13
+
+    echo ""
+    echo "  FlexGPIO Bootloader flash complete"
+}
+
+# ===== FLEXIHAL STM32 FLASH =====
+flash_flexihal_stm32() {
+    echo "============================================"
+    echo "  FlexiHAL (STM32F4)"
+    echo "============================================"
+
+    # Firmware prompt
+    local default_path
+    default_path=$(resolve_firmware "remora-flexi-hal" "$REPO_REMORA" "$ASSET_STM32") || true
+
+    bin_file=$(prompt_firmware "STM32F4" "$default_path")
+    if [[ ! -f "$bin_file" ]]; then
+        echo "Error: firmware not found: $bin_file"
+        return 1
+    fi
+
+    # Find GPIO chip
+    gpio_chip=$(find_gpiochip_for_pin 17)
+    if [[ -z "$gpio_chip" ]]; then
+        echo "Error: no gpiochip with GPIO 17 found"
+        return 1
+    fi
+    echo "  Using $gpio_chip for BOOT0 (GPIO18) / RESET (GPIO17)"
+
+    # Enter bootloader
+    echo ""
+    echo "=== Entering bootloader ==="
+    stty -F /dev/ttyAMA0 115200
+    read -t 5 < /dev/ttyAMA0 &
+    sleep 1
+
+    gpioset "$gpio_chip" 18=1
+    sleep 1
+
+    gpioset "$gpio_chip" 17=0
+    sleep 1
+
+    gpioget "$gpio_chip" 17 > /dev/null
+    sleep 1
+    gpioget "$gpio_chip" 18 > /dev/null
+    sleep 2
+
+    # Flash with retries
+    echo ""
+    echo "=== Flashing ==="
+    retries=5
+    count=0
+    while [[ $count -lt $retries ]]; do
+        echo "  Attempt $((count + 1))/$retries..."
+        if stm32flash /dev/ttyAMA0 -b 115200 -w "$bin_file"; then
+            echo "  Flash successful"
+            break
+        fi
+        count=$((count + 1))
+        if [[ $count -lt $retries ]]; then
+            echo "  Retrying in 2s..."
+            sleep 2
+        else
+            echo "Error: flash failed after $retries attempts"
+            return 1
+        fi
+    done
+
+    # Exit bootloader - release reset
+    echo ""
+    echo "=== Resetting board ==="
+    gpioset "$gpio_chip" 17=0
+    sleep 1
+    gpioget "$gpio_chip" 17 > /dev/null
+    gpioset "$gpio_chip" 18=0
+    cleanup_flash_pins 17
+    cleanup_flash_pins 18
+
+    echo ""
+    echo "FlexiHAL (STM32F4) flash successful."
+}
+
+# ===== MAIN =====
+main() {
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -d|--debug) DEBUG=true; shift ;;
+            *) echo "Unknown option: $1"; exit 1 ;;
+        esac
+    done
+
+    echo "============================================"
+    echo "  FlexiHAL Firmware Flasher"
+    echo "============================================"
+    echo ""
+
+
+    # ---- Platform ----
+    verbose ""
+    verbose "Detecting Pi platform..."
+    PLATFORM=$(detect_platform)
+    if [[ "$PLATFORM" == "unknown" ]]; then
+        echo "Error: unknown platform (only Pi 4 and Pi 5 supported)"
+        exit 1
+    fi
+    verbose "  Platform: $PLATFORM"
+
+    if [[ "$PLATFORM" == "pi5" ]]; then
+        RP1_GPIO_BASE=$(get_rp1_gpio_base)
+        if [[ -z "$RP1_GPIO_BASE" ]]; then
+            echo "Error: could not find RP1 gpiochip on Pi 5"
+            exit 1
+        fi
+        verbose "  RP1 GPIO base: $RP1_GPIO_BASE"
+    fi
+
+    # ---- OpenOCD TCL dir ----
+    TCL_DIR="$TCL_DIR_DEFAULT"
+    if [[ ! -d "$TCL_DIR" ]]; then
+        verbose "TCL scripts not at $TCL_DIR, checking fallbacks..."
+        for fallback in /usr/share/openocd/scripts /opt/openocd/scripts; do
+            if [[ -d "$fallback" ]]; then
+                TCL_DIR="$fallback"
+                break
+            fi
+        done
+        if [[ ! -d "$TCL_DIR" ]]; then
+            echo "Error: OpenOCD TCL scripts directory not found at $TCL_DIR_DEFAULT"
+            exit 1
+        fi
+        verbose "  Using $TCL_DIR"
+    fi
+
+    # ---- Dependencies ----
+    verbose ""
+    verbose "Dependencies:"
+
+    DEPS_CURL=$(check_cmd curl && echo yes || echo no)
+    DEPS_OPENOCD=$(check_cmd openocd && echo yes || echo no)
+    DEPS_STM32FLASH=$(check_cmd stm32flash && echo yes || echo no)
+    DEPS_GPIOSET=$(check_cmd gpioset && echo yes || echo no)
+    DEPS_READELF=$(check_cmd readelf && echo yes || echo no)
+    DEPS_STTY=$(check_cmd stty && echo yes || echo no)
+
+    verbose "$(printf "  %-15s %s" "curl"         "$( [[ $DEPS_CURL       == yes ]] && green "found" || red "missing" )")"
+    verbose "$(printf "  %-15s %s" "openocd"      "$( [[ $DEPS_OPENOCD    == yes ]] && green "found" || red "missing" )")"
+    verbose "$(printf "  %-15s %s" "stm32flash"   "$( [[ $DEPS_STM32FLASH == yes ]] && green "found" || red "missing" )")"
+    verbose "$(printf "  %-15s %s" "gpioset"      "$( [[ $DEPS_GPIOSET   == yes ]] && green "found" || red "missing" )")"
+    verbose "$(printf "  %-15s %s" "readelf"      "$( [[ $DEPS_READELF   == yes ]] && green "found" || red "missing" )")"
+    verbose "$(printf "  %-15s %s" "stty"         "$( [[ $DEPS_STTY      == yes ]] && green "found" || red "missing" )")"
+    verbose ""
+
+    # ---- Board selection ----
+    echo "Select board to flash:"
+    echo "  1) FlexiHAL 2350       (RP2350)"
+    echo "  2) FlexGPIO Bootloader (RP2040)"
+    echo "  3) FlexiHAL            (STM32F4)"
+    echo "  q) Quit"
+    echo ""
+
+    read -r -p "Choice [1/2/3/q]: " choice
+    echo ""
+
+    local flash_result=0
+
+    case "$choice" in
+        1)
+            if [[ "$DEPS_OPENOCD" != "yes" ]]; then
+                echo "Error: openocd is required for FlexiHAL 2350"
+                exit 1
+            fi
+            flash_flexihal_2350 || flash_result=$?
+            ;;
+        2)
+            if [[ "$DEPS_OPENOCD" != "yes" ]]; then
+                echo "Error: openocd is required for FlexGPIO Bootloader"
+                exit 1
+            fi
+            if [[ "$DEPS_READELF" != "yes" ]]; then
+                echo "Warning: readelf not found (only needed for nuke mode)"
+            fi
+            flash_flexgpio_bootloader || flash_result=$?
+            ;;
+        3)
+            if [[ "$DEPS_STM32FLASH" != "yes" ]]; then
+                echo "Error: stm32flash is required for FlexiHAL (STM32F4)"
+                exit 1
+            fi
+            if [[ "$DEPS_GPIOSET" != "yes" ]]; then
+                echo "Error: gpioset is required for FlexiHAL (STM32F4)"
+                exit 1
+            fi
+            if [[ "$DEPS_STTY" != "yes" ]]; then
+                echo "Error: stty is required for FlexiHAL (STM32F4)"
+                exit 1
+            fi
+            if [[ "$DEPS_READELF" != "yes" ]]; then
+                echo "Warning: readelf not found (not needed for STM32 flash)"
+            fi
+            flash_flexihal_stm32 || flash_result=$?
+            ;;
+        q|Q)
+            echo "Exiting."
+            exit 0
+            ;;
+        *)
+            echo "Invalid choice"
+            exit 1
+            ;;
+    esac
+
+    echo ""
+    echo "============================================"
+    if [[ $flash_result -eq 0 ]]; then
+        echo "  $(green "Flashing success.")"
+    else
+        echo "  $(red "Flashing failed.")"
+    fi
+    echo "============================================"
+    exit $flash_result
+}
+
+main "$@"

@@ -139,6 +139,7 @@ if [ $USERACCT -eq 0 ]; then
 	adduser ${USERNAME} render
 	adduser ${USERNAME} tty
 	adduser ${USERNAME} i2c
+	adduser ${USERNAME} kmem
 	groupadd gpio
 	groupadd spi
 	adduser ${USERNAME} gpio
@@ -177,6 +178,12 @@ EOF
 fi
 
 # user script
+if [ $USERACCT -eq 0 ] && [ -d "/root/homedir" ]; then
+	for item in /root/homedir/*; do
+		[ -e "$item" ] && cp -r "$item" /home/${USERNAME}/
+	done
+	chown -R ${USERNAME}:${USERNAME} /home/${USERNAME}
+fi
 if [ $USCRIPTS -eq 1 ]; then uscripts_stage2; fi
 
 # skins
@@ -193,6 +200,12 @@ if [ $USERACCT -eq 0 ]; then
 	mv -f user-ini /home/${USERNAME}/.config/mc/ini;
 	mv -f nanorc-user /home/${USERNAME}/.nanorc;
 	chown -R ${USERNAME}:${USERNAME} /home/${USERNAME};
+	# Install flash tools
+	mkdir -p /usr/local/bin
+	for tool in flash_firmware; do
+		[ -f "$tool" ] && mv -f "$tool" /usr/local/bin/
+	done 2>/dev/null || true
+	chmod +x /usr/local/bin/* 2>/dev/null || true
 fi
 
 # scripts
@@ -301,6 +314,25 @@ else
 	ifupdown-credentials > /dev/null 2>&1
 fi
 
+# Default ethernet connection with DHCP and secondary static IP
+if [ $NETWORKMANAGER -eq 1 ]; then
+	mkdir -p /etc/NetworkManager/system-connections
+	NM_UUID=$(cat /proc/sys/kernel/random/uuid)
+	tee /etc/NetworkManager/system-connections/eth0.nmconnection <<EOF
+[connection]
+uuid=${NM_UUID}
+type=ethernet
+interface-name=eth0
+autoconnect=true
+
+[ipv4]
+method=auto
+address1=192.168.5.2/24
+address2=10.10.10.2/24
+EOF
+	chmod 600 /etc/NetworkManager/system-connections/eth0.nmconnection
+fi
+
 # board information
 if [[ -f "/root/board.txt" ]]; then
 	cp -f /root/board.txt /etc/opt/
@@ -326,9 +358,9 @@ fi
 echo ""
 echo "Installing pi-bluetooth ..."
 if [[ "$DISTRO" == "ubuntu" ]]; then
-	git clone https://github.com/pyavitz/pi-bluetooth.git -b ubuntu
+	git clone --depth 1 https://github.com/pyavitz/pi-bluetooth.git -b ubuntu
 else
-	git clone https://github.com/pyavitz/pi-bluetooth.git
+	git clone --depth 1 https://github.com/pyavitz/pi-bluetooth.git
 fi
 cd pi-bluetooth
 chmod +x debian/rules

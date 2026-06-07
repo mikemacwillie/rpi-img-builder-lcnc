@@ -78,12 +78,12 @@ apt-get update
 echo 'Installing LinuxCNC'
 apt-get install -y linuxcnc-uspace linuxcnc-uspace-dev mesaflash
 
-echo 'Installing Flexi dependencies'
-apt-get install -y git pigpio-tools stm32flash qtbase5-dev qt5-qmake libmodbus-dev python3-gst-1.0
+echo 'Installing Flexi dependencies and tools'
+apt-get install -y git pigpio-tools stm32flash qtbase5-dev qt5-qmake libmodbus-dev python3-gst-1.0 cutecom libusb-1.0-0-dev
 
 echo 'Building vfdmod'
 cd /tmp
-git clone https://github.com/mikemacwillie/vfdmod.git
+git clone --depth 1 https://github.com/mikemacwillie/vfdmod.git
 mkdir vfdmod/build
 cd vfdmod/build
 qmake ../vfdmod.pro
@@ -91,47 +91,87 @@ make
 cp vfdmod /usr/bin
 
 echo 'Cloning the remora-flexi hal repo and building flexi component'
-cd /home/expatria
+cd /home/${USERNAME}
 git clone https://github.com/Expatria-Technologies/remora-flexi-hal.git remora-flexi-hal
 cd remora-flexi-hal/LinuxCNC/Components/Flexi/
 halcompile --install flexi.c
-mkdir /home/expatria/linuxcnc
-mkdir /home/expatria/linuxcnc/configs
-mkdir /home/expatria/linuxcnc/nc_files
-cp -av /home/expatria/remora-flexi-hal/LinuxCNC/ConfigSamples/flexi-hal /home/expatria/linuxcnc/configs
-if [ $BOARD == "bcm2712" ]; then
-   echo "Using Pi 5 scripts"
-   cp -av /home/expatria/remora-flexi-hal/Tools/Pi\ Scripts/Pi5/* /home/expatria
-elif [ $BOARD == "bcm2711" ]; then
-   echo "Using Pi 4 scripts"
-   cp -av /home/expatria/remora-flexi-hal/Tools/Pi\ Scripts/Pi4/* /home/expatria
+mkdir /home/${USERNAME}/linuxcnc
+mkdir /home/${USERNAME}/linuxcnc/configs
+mkdir /home/${USERNAME}/linuxcnc/nc_files
+cp -av /home/${USERNAME}/remora-flexi-hal/LinuxCNC/ConfigSamples/flexi-hal /home/${USERNAME}/linuxcnc/configs
+if [ $BOARD == "bcm2711" ]; then
    echo "Reconfiguring vfdmod serial port for Pi 4"
-   sed -i 's/AMA2/AMA3/' /home/expatria/linuxcnc/configs/flexi-hal/vfdmod.ini
+   sed -i 's/AMA2/AMA3/' /home/${USERNAME}/linuxcnc/configs/flexi-hal/vfdmod.ini
 fi
 
 
 echo 'Cloning the Remora repo and building remora-eth component for use with uFlexiNet'
 cd /tmp
-git clone https://github.com/Expatria-Technologies/Remora.git
+git clone --depth 1 https://github.com/Expatria-Technologies/Remora.git
 cd Remora/LinuxCNC/Components/Remora-eth
 halcompile --install remora-eth.c
 
 echo 'Cloning the linuxcnc_configs repo and grabbing the uFlexiNet reference config'
 cd /tmp
-git clone https://github.com/Expatria-Technologies/linuxcnc_configs.git
-cp -av /tmp/linuxcnc_configs/flexi-hal-uFlexiNet-XYZ /home/expatria/linuxcnc/configs/uFlexiNet
+git clone --depth 1 https://github.com/Expatria-Technologies/linuxcnc_configs.git
+cp -av /tmp/linuxcnc_configs/flexi-hal-uFlexiNet-XYZ /home/${USERNAME}/linuxcnc/configs/uFlexiNet
 if [ $BOARD == "bcm2712" ]; then
    echo "Configuring for Pi 5"
-   sed -i 's/AMA1/AMA2/' /home/expatria/linuxcnc/configs/uFlexiNet/vfdmod.ini
+   sed -i 's/AMA1/AMA2/' /home/${USERNAME}/linuxcnc/configs/uFlexiNet/vfdmod.ini
 elif [ $BOARD == "bcm2711" ]; then
    echo "Configuring for Pi 4"
-   sed -i 's/AMA1/AMA3/' /home/expatria/linuxcnc/configs/uFlexiNet/vfdmod.ini
-   sed -i 's/AMA2/AMA3/' /home/expatria/linuxcnc/configs/uFlexiNet/vfdmod.ini
+   sed -i 's/AMA1/AMA3/' /home/${USERNAME}/linuxcnc/configs/uFlexiNet/vfdmod.ini
+   sed -i 's/AMA2/AMA3/' /home/${USERNAME}/linuxcnc/configs/uFlexiNet/vfdmod.ini
 fi
+
+
+echo 'Cloning the Flexi-Ninja repo and building flexi-ninja components'
+cd /home/${USERNAME}
+git clone https://github.com/Expatria-Technologies/Flexi-Ninja.git flexi-ninja
+cd flexi-ninja/hal-driver/
+./make_symlinks.sh
+./install.sh
+#May need these later if we reorder things. Created in the remora-flexi-hal step right now.
+#mkdir /home/${USERNAME}/linuxcnc
+#mkdir /home/${USERNAME}/linuxcnc/configs
+#mkdir /home/${USERNAME}/linuxcnc/nc_files
+cp -av /home/${USERNAME}/flexi-ninja/config-samples/flexi-ninja /home/${USERNAME}/linuxcnc/configs
+cp -av /home/${USERNAME}/flexi-ninja/config-samples/flexi-ninja-eth /home/${USERNAME}/linuxcnc/configs
+if [ $BOARD == "bcm2711" ]; then
+   echo "Reconfiguring vfdmod serial port for Pi 4"
+   sed -i 's/AMA2/AMA3/' /home/${USERNAME}/linuxcnc/configs/flexi-ninja/vfdmod.ini
+   sed -i 's/AMA2/AMA3/' /home/${USERNAME}/linuxcnc/configs/flexi-ninja-eth/vfdmod.ini
+fi
+
+
+echo 'Populating the firmware directories'
+#Flexi-Ninja SPI
+curl -fsSL -o /home/${USERNAME}/firmware/flexi-ninja/Flexi-Ninja_FlexiHAL_2350_SPI.elf https://github.com/Expatria-Technologies/flexi-ninja/releases/latest/download/Flexi-Ninja_FlexiHAL_2350_SPI.elf
+curl -fsS https://api.github.com/repos/Expatria-Technologies/flexi-ninja/releases/latest | awk -F'"' '/"tag_name":/{t=$4} t && /"updated_at":/{print t; print $4; exit}' > /home/${USERNAME}/firmware/flexi-ninja/Flexi-Ninja_FlexiHAL_2350_SPI.elf.version
+#Flexi-Ninja Ethernet
+curl -fsSL -o /home/${USERNAME}/firmware/flexi-ninja/Flexi-Ninja_FlexiHAL_2350_W5500.elf https://github.com/Expatria-Technologies/flexi-ninja/releases/latest/download/Flexi-Ninja_FlexiHAL_2350_W5500.elf
+curl -fsS https://api.github.com/repos/Expatria-Technologies/flexi-ninja/releases/latest | awk -F'"' '/"tag_name":/{t=$4} t && /"updated_at":/{print t; print $4; exit}' > /home/${USERNAME}/firmware/flexi-ninja/Flexi-Ninja_FlexiHAL_2350_W5500.elf.version
+# FlexGPIO Bootloader
+curl -fsSL -o /home/${USERNAME}/firmware/flexgpio_bootloader/FlexGPIO_bootloader.elf https://github.com/Expatria-Technologies/FlexGPIO_Bootloader/releases/latest/download/FlexGPIO_bootloader.elf
+curl -fsS https://api.github.com/repos/Expatria-Technologies/FlexGPIO_Bootloader/releases/latest | awk -F'"' '/"tag_name":/{t=$4} t && /"updated_at":/{print t; print $4; exit}' > /home/${USERNAME}/firmware/flexgpio_bootloader/FlexGPIO_bootloader.elf.version
+# Remora Flex-HAL
+curl -fsSL -o /home/${USERNAME}/firmware/remora-flexi-hal/Remora-Flex-Hal_v1.0.0.bin https://github.com/Expatria-Technologies/remora-flexi-hal/releases/latest/download/Remora-Flex-Hal_v1.0.0.bin
+curl -fsS https://api.github.com/repos/Expatria-Technologies/remora-flexi-hal/releases/latest | awk -F'"' '/"tag_name":/{t=$4} t && /"updated_at":/{print t; print $4; exit}' > /home/${USERNAME}/firmware/remora-flexi-hal/Remora-Flex-Hal_v1.0.0.bin.version
+
+
+echo 'Installing RPi OpenOCD for board flashing'
+cd /tmp/
+git clone --depth 1 --shallow-submodules https://github.com/raspberrypi/openocd.git --recurse-submodules
+cd openocd
+./bootstrap
+./configure --enable-internal-jimtcl --enable-sysfsgpio --enable-bcm2835gpio
+make -j$(nproc)
+sudo make install
+
 
 echo 'Cloning the upstream Remora repo and installing the default remora-spi and remora-eth-3.0 components for non-Expatria boards'
 cd /tmp
-git clone https://github.com/scottalford75/Remora.git Remora-upstream
+git clone --depth 1 https://github.com/scottalford75/Remora.git Remora-upstream
 cd Remora-upstream/LinuxCNC/Components/Remora-spi
 halcompile --install remora-spi.c
 cd /tmp/Remora-upstream/LinuxCNC/Components/Remora-eth
@@ -139,12 +179,13 @@ halcompile --install remora-eth-3.0.c
 cd /tmp/Remora-upstream/LinuxCNC/Components/PRUencoder
 halcompile --install PRUencoder.c
 
+
 echo 'Copying ngcgui library to config dir'
-cp -av /usr/share/linuxcnc/ncfiles/ngcgui_lib /home/expatria/linuxcnc/
+cp -av /usr/share/linuxcnc/ncfiles/ngcgui_lib /home/${USERNAME}/linuxcnc/
 
 
-echo 'Enabling auto-login for expatria user'
-sed -i 's/\#autologin-user=/autologin-user=expatria/' /etc/lightdm/lightdm.conf
+echo 'Enabling auto-login for ${USERNAME} user'
+sed -i "s/\#autologin-user=/autologin-user=${USERNAME}/" /etc/lightdm/lightdm.conf
 
 echo 'Disabling display power management and sleep by default'
 tee /etc/xdg/xfce4/xfconf/xfce-perchannel-xml/xfce4-power-manager.xml <<EOF
@@ -166,77 +207,7 @@ rm -Rf /tmp/Remora
 rm -Rf /tmp/Remora-upstream
 rm -Rf /tmp/linuxcnc_configs
 rm -rf /tmp/linuxcnc
-
-echo 'Adding README to Desktop'
-mkdir /home/expatria/Desktop
-tee /home/expatria/Desktop/README <<EOF
-Getting started:
-
-For SPI with a Pi connected directly to the Flexi-HAL: 
-
-A git checkout of the Remora-flexi repository is present in the home directory. Update it before getting started to make sure you have the most recent version. Run 'git pull' from within the /home/expatria/remora-flexi-hal directory to update.
-
-Connect 24V power to your Flexi-HAL and a suitable USB-C to your Raspberry Pi. Do not connect anything to the USB-C port on the Flexi-HAL while flashing Remora over the GPIO header. Doing so may prevent the UART bootloader from functioning.Flash your Flexi with the current build of Remora by running the following command in a terminal:
-
-~/flash_flexi ~/remora-flexi-hal/Firmware/FirmwareBin/FLEXIHAL/firmware.bin
-
-The output should look similar to the following:
-
----------------------------------------------------------------------
-
-Entering bootloader...
-stm32flash 0.7
-
-http://stm32flash.sourceforge.net/
-
-Using Parser : Raw BINARY
-Size         : 150776
-Interface serial_posix: 115200 8E1
-Version      : 0x31
-Option 1     : 0x00
-Option 2     : 0x00
-Device ID    : 0x0421 (STM32F446xx)
-- RAM        : Up to 128KiB  (12288b reserved by bootloader)
-- Flash      : Up to 512KiB (size first sector: 1x16384)
-- Option RAM : 16b
-- System RAM : 30KiB
-Write to memory
-Erasing memory
-Wrote address 0x08024cf8 (100.00%) Done.
-
-Resetting board...
-Done!
-
----------------------------------------------------------------------
-
-
-If there is a 'Failed to init device.' response, there has been an error flashing the firmware which will need to be resolved before proceeding. 
-
-A base PrintNC configuration is provided in the LinuxCNC config directory at /home/expatria/linuxcnc/configs/flexi-hal. Edit the INI with your machine configuration prior to attempting motion.
-This base configuration includes QtDragon_hd and vfdmod; vfdmod is configured for the Durapulse GS10 VFD, but the configuration can be changed fairly easily to suit a Modbus VFD. A sample HAL configuration for the HY VFD is included in the reference config, commented out. There are comments in the HAL file to detail what to uncomment/comment out. 
-
-
-For Ethernet via uFlexinet: 
-
-The remora-eth component is pre-installed in this image. Also included is a reference configuration for use with the uFlexiNet in the LinuxCNC config directory at /home/expatria/linuxcnc/configs/uFlexiNet. You will need upload your configuration file to the FlexiHAL using the upload_config.py script that should be in your configuration folder:
-
-python3 upload_config.py FlexiHAL-config.txt
-
-To use the RS485 interface on the FlexiHAL via the uFlexiNet you can set up a virtual serial port and use socat to bridge between userspace Modbus components and Remora. If the RS485 component is included in the board config txt, it will listen on port 27183 for UDP packets and forward them to the RS485 port: 
-
-socat pty, link=/tmp/virtualcom0, raw udp:10.10.10.10:27183 &
-
-More information on the Ethernet implmentation can be found in the README in the repository: https://github.com/Expatria-Technologies/Remora-STM32F4xx-W5500
-
-
-
-
-If you'd like to autostart LinuxCNC on boot after configuring your machine, add 'linuxcnc -l' to 'Application Autostart' in the 'Session and Startup' menu to automatically load the configuration you last selected in the LinuxCNC selection window. 
-
-
-EOF
-
-
+rm -rf /tmp/openocd
 
 # Finished!
 echo "Stage 2 done"

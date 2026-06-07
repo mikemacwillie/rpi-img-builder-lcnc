@@ -6,7 +6,7 @@ echo ""
 echo "Adding firmware ..."
 mkdir -p /lib/firmware/brcm
 mkdir -p /lib/firmware/updates
-git clone https://github.com/pyavitz/firmware.git /lib/firmware/updates/brcm
+git clone --depth 1 https://github.com/pyavitz/firmware.git /lib/firmware/updates/brcm
 mv fw-0a5c_21e8.hcd /lib/firmware/brcm/BCM20702A0-0a5c-21e8.hcd
 cp /lib/firmware/brcm/BCM20702A0-0a5c-21e8.hcd /lib/firmware/brcm/BCM20702A1-0a5c-21e8.hcd
 chown root:root /lib/firmware/brcm/BCM20702A1-0a5c-21e8.hcd
@@ -25,7 +25,7 @@ if [[ `wget -S --spider https://kernel.googlesource.com/pub/scm/linux/kernel/git
 	fi
 fi
 cd ~
-git clone -q -b realtek https://github.com/pyavitz/firmware.git
+git clone -q --depth 1 -b realtek https://github.com/pyavitz/firmware.git
 if [[ -d "firmware" ]]; then
 	cp -fr firmware/* /lib/firmware/updates/
 	rm -fdr firmware
