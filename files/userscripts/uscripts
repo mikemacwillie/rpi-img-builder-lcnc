@@ -143,8 +143,8 @@ if [ $BOARD == "bcm2711" ]; then
    sed -i 's/AMA2/AMA3/' /home/${USERNAME}/linuxcnc/configs/flexi-ninja-eth/vfdmod.ini
 fi
 
-
 echo 'Populating the firmware directories'
+mkdir -p /home/${USERNAME}/firmware/flexi-ninja /home/${USERNAME}/firmware/flexgpio_bootloader /home/${USERNAME}/firmware/remora-flexi-hal
 #Flexi-Ninja SPI
 curl -fsSL -o /home/${USERNAME}/firmware/flexi-ninja/Flexi-Ninja_FlexiHAL_2350_SPI.elf https://github.com/Expatria-Technologies/flexi-ninja/releases/latest/download/Flexi-Ninja_FlexiHAL_2350_SPI.elf
 curl -fsS https://api.github.com/repos/Expatria-Technologies/flexi-ninja/releases/latest | awk -F'"' '/"tag_name":/{t=$4} t && /"updated_at":/{print t; print $4; exit}' > /home/${USERNAME}/firmware/flexi-ninja/Flexi-Ninja_FlexiHAL_2350_SPI.elf.version || true
