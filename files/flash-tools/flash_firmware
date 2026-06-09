@@ -235,6 +235,21 @@ cleanup_flash_pins() {
 }
 
 # ===== OPENOCD FLASH TARGET =====
+run_openocd() {
+    local tmp_log ocd_rc=0
+    tmp_log=$(mktemp)
+    set +o pipefail
+    openocd "$@" 2>&1 | tee "$tmp_log"
+    ocd_rc=${PIPESTATUS[0]}
+    set -o pipefail
+    if [[ $ocd_rc -ne 0 ]] || grep -qiE 'error:|init failed|failed to connect' "$tmp_log"; then
+        rm -f "$tmp_log"
+        echo >&2 "Error: OpenOCD flash failed"
+        return 1
+    fi
+    rm -f "$tmp_log"
+}
+
 flash_target() {
     local firmware="$1"
     local target_cfg="$2"
@@ -269,7 +284,7 @@ flash_target() {
     case "$PLATFORM" in
         pi4)
             if $nuke_mode; then
-                openocd -s "$tcl" \
+                run_openocd -s "$tcl" \
                     -f "interface/raspberrypi-native.cfg" \
                     -c "transport select swd" \
                     -c "adapter gpio swdio -chip 0 $swdio" \
@@ -280,23 +295,23 @@ flash_target() {
                     -c "halt" \
                     -c "load_image $firmware" \
                     -c "resume $entry" \
-                    -c "shutdown"
+                    -c "shutdown" || return 1
             else
-                openocd -s "$tcl" \
+                run_openocd -s "$tcl" \
                     -f "interface/raspberrypi-native.cfg" \
                     -c "transport select swd" \
                     -c "adapter gpio swdio -chip 0 $swdio" \
                     -c "adapter gpio swclk -chip 0 $swclk" \
                     -c "adapter speed 1000" \
                     -f "$target_cfg" \
-                    -c "program $firmware verify reset exit"
+                    -c "program $firmware verify reset exit" || return 1
             fi
             ;;
         pi5)
             local swdio_g=$((RP1_GPIO_BASE + swdio))
             local swclk_g=$((RP1_GPIO_BASE + swclk))
             if $nuke_mode; then
-                openocd -s "$tcl" \
+                run_openocd -s "$tcl" \
                     -c "adapter driver sysfsgpio" \
                     -c "sysfsgpio swclk_num $swclk_g" \
                     -c "sysfsgpio swdio_num $swdio_g" \
@@ -307,16 +322,16 @@ flash_target() {
                     -c "halt" \
                     -c "load_image $firmware" \
                     -c "resume $entry" \
-                    -c "shutdown"
+                    -c "shutdown" || return 1
             else
-                openocd -s "$tcl" \
+                run_openocd -s "$tcl" \
                     -c "adapter driver sysfsgpio" \
                     -c "sysfsgpio swclk_num $swclk_g" \
                     -c "sysfsgpio swdio_num $swdio_g" \
                     -c "transport select swd" \
                     -c "adapter speed 1000" \
                     -f "$target_cfg" \
-                    -c "program $firmware verify reset exit"
+                    -c "program $firmware verify reset exit" || return 1
             fi
             ;;
     esac
